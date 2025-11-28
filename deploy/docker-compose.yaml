@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  python-executor:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PYEXEC_PORT=8080
+      - PYEXEC_HOST=0.0.0.0
+      - PYEXEC_LOG_LEVEL=info
+      - PYEXEC_DOCKER_SOCKET=/var/run/docker.sock
+      - PYEXEC_DEFAULT_TIMEOUT=300
+      - PYEXEC_DEFAULT_MEMORY_MB=1024
+      - PYEXEC_DEFAULT_DISK_MB=2048
+      - PYEXEC_DEFAULT_CPU_SHARES=1024
+      - PYEXEC_DEFAULT_IMAGE=python:3.12-slim
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  consul:
+    image: hashicorp/consul:1.19
+    ports:
+      - "8500:8500"
+    command: agent -dev -client=0.0.0.0
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    restart: unless-stopped
+
+  python-executor-with-consul:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - PYEXEC_PORT=8080
+      - PYEXEC_HOST=0.0.0.0
+      - PYEXEC_LOG_LEVEL=info
+      - PYEXEC_CONSUL_ADDR=consul:8500
+      - PYEXEC_CONSUL_PREFIX=python-executor
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - consul
+    restart: unless-stopped
