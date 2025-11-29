@@ -9,6 +9,7 @@ python-executor is configured via environment variables.
 | `PYEXEC_HOST` | `0.0.0.0` | HTTP server bind address |
 | `PYEXEC_PORT` | `8080` | HTTP server port |
 | `PYEXEC_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `PYEXEC_SERVER` | `http://localhost:8080` | Server base URL (used by CLI) |
 
 ## Docker Configuration
 
@@ -76,3 +77,5 @@ Or via command-line flags:
 ```bash
 python-executor run --server http://localhost:8080 script.py
 ```
+
+The `PYEXEC_SERVER` environment variable and `--server` flag allow you to specify the base URL of the python-executor server when using the CLI tool. This is particularly useful when running the CLI against a remote server or a different local port.

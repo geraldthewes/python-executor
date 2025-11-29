@@ -58,6 +58,13 @@ python-executor run script.py --timeout 600 --memory 2048 --network
 # Async execution
 id=$(python-executor submit long-script.py --async)
 python-executor follow $id
+
+# Specify server URL via flag
+python-executor --server http://my-server:8080 run script.py
+
+# Specify server URL via environment variable
+export PYEXEC_SERVER=http://my-server:8080
+python-executor run script.py
 ```
 
 See [Examples](docs/examples.md) for more CLI usage patterns.
@@ -197,6 +204,7 @@ Configuration is via environment variables:
 # Server
 export PYEXEC_PORT=8080
 export PYEXEC_LOG_LEVEL=info
+export PYEXEC_SERVER=http://localhost:8080
 
 # Consul (optional)
 export PYEXEC_CONSUL_ADDR=consul:8500
@@ -205,6 +213,8 @@ export PYEXEC_CONSUL_ADDR=consul:8500
 export PYEXEC_DEFAULT_TIMEOUT=300
 export PYEXEC_DEFAULT_MEMORY_MB=1024
 ```
+
+The `PYEXEC_SERVER` environment variable specifies the base URL of the python-executor server. This can be overridden with the `--server` flag when using the CLI tool.
 
 See [Configuration Guide](docs/configuration.md) for all options.
 
