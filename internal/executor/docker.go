@@ -28,6 +28,7 @@ func NewDockerExecutor(cfg *config.Config) (*DockerExecutor, error) {
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithHost("unix://"+cfg.Docker.Socket),
+		client.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating docker client: %w", err)
