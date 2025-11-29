@@ -1,9 +1,10 @@
-.PHONY: help build build-server build-cli test test-unit test-integration lint clean docker-build run-server install-tools
+.PHONY: help build build-server build-cli test test-unit test-integration lint clean docker-build docker-push run-server install-tools
 
 # Build configuration
 BINARY_SERVER := bin/python-executor-server
 BINARY_CLI := bin/python-executor
-DOCKER_IMAGE := python-executor:latest
+DOCKER_IMAGE := registry.cluster:5000/python-executor:latest
+DOCKER_IMAGE_LATEST := registry.cluster:5000/python-executor:latest
 GO_BUILD_FLAGS := -ldflags="-s -w"
 CGO_ENABLED := 0
 
@@ -46,7 +47,11 @@ clean: ## Clean build artifacts
 
 docker-build: ## Build Docker image
 	@echo "Building Docker image..."
-	docker build -t $(DOCKER_IMAGE) -f deploy/Dockerfile .
+	docker build -t $(DOCKER_IMAGE) -f Dockerfile .
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "Pushing Docker image to registry..."
+	docker push $(DOCKER_IMAGE)
 
 run-server: build-server ## Run the server locally
 	@echo "Starting server..."
