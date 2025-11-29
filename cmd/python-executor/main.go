@@ -250,6 +250,11 @@ func prepareExecution(args []string) ([]byte, *client.Metadata, error) {
 			return nil, nil, fmt.Errorf("reading stdin: %w", err)
 		}
 
+		// Validate stdin is not empty
+		if len(stdinData) == 0 {
+			return nil, nil, fmt.Errorf("no input provided: either specify a file/directory argument or pipe code via stdin")
+		}
+
 		tarData, err = client.TarFromReader(strings.NewReader(string(stdinData)), "main.py")
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating tar from stdin: %w", err)

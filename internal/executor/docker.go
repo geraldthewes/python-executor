@@ -1,10 +1,10 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,7 +13,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/geraldthewes/python-executor/internal/config"
-	internalttar "github.com/geraldthewes/python-executor/internal/tar"
 	clientpkg "github.com/geraldthewes/python-executor/pkg/client"
 )
 
@@ -52,25 +51,13 @@ func (e *DockerExecutor) Execute(ctx context.Context, req *ExecutionRequest) (*E
 	execCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Create temporary work directory
-	workDir, err := os.MkdirTemp("", fmt.Sprintf("pyexec-%s-*", req.ID))
-	if err != nil {
-		return nil, fmt.Errorf("creating work directory: %w", err)
-	}
-	defer os.RemoveAll(workDir)
-
-	// Extract tar archive
-	if err := internalttar.ExtractToDir(req.TarData, workDir); err != nil {
-		return nil, fmt.Errorf("extracting tar: %w", err)
-	}
-
 	// Pull Docker image if needed
 	if err := e.ensureImage(execCtx, meta.DockerImage); err != nil {
 		return nil, fmt.Errorf("ensuring image: %w", err)
 	}
 
-	// Create container
-	containerID, err := e.createContainer(execCtx, meta, workDir)
+	// Create container and copy tar data into it
+	containerID, err := e.createContainer(execCtx, meta, req.TarData)
 	if err != nil {
 		return nil, fmt.Errorf("creating container: %w", err)
 	}
@@ -144,9 +131,9 @@ func (e *DockerExecutor) ensureImage(ctx context.Context, imageName string) erro
 }
 
 // createContainer creates a Docker container with security constraints
-func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Metadata, workDir string) (string, error) {
+func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Metadata, tarData []byte) (string, error) {
 	// Build command
-	cmd := e.buildCommand(meta, workDir)
+	cmd := e.buildCommand(meta)
 
 	// Network mode
 	networkMode := "none"
@@ -180,13 +167,8 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 	hostConfig := &container.HostConfig{
 		NetworkMode: container.NetworkMode(networkMode),
 		Resources:   resources,
-		ReadonlyRootfs: true,
 		Tmpfs: map[string]string{
-			"/work": fmt.Sprintf("size=%dm", meta.Config.DiskMB),
-			"/tmp":  "size=100m",
-		},
-		Binds: []string{
-			fmt.Sprintf("%s:/work-init:ro", workDir),
+			"/tmp": "size=100m",
 		},
 	}
 
@@ -196,15 +178,20 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 		return "", err
 	}
 
+	// Copy tar data directly to /work in the container
+	// Note: We copy to /work which is a tmpfs, so the files are written to memory
+	tarReader := bytes.NewReader(tarData)
+	if err := e.client.CopyToContainer(ctx, resp.ID, "/work", tarReader, container.CopyToContainerOptions{}); err != nil {
+		e.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+		return "", fmt.Errorf("copying files to container: %w", err)
+	}
+
 	return resp.ID, nil
 }
 
 // buildCommand creates the shell command to run inside the container
-func (e *DockerExecutor) buildCommand(meta *clientpkg.Metadata, workDir string) string {
+func (e *DockerExecutor) buildCommand(meta *clientpkg.Metadata) string {
 	var parts []string
-
-	// Copy files from read-only mount to tmpfs
-	parts = append(parts, "cp -r /work-init/* /work/ 2>/dev/null || true")
 
 	// Run pre-commands
 	for _, cmd := range meta.PreCommands {

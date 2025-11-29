@@ -3,7 +3,7 @@
 # Build configuration
 BINARY_SERVER := bin/python-executor-server
 BINARY_CLI := bin/python-executor
-VERSION := v0.1
+VERSION := v0.4
 DOCKER_IMAGE := registry.cluster:5000/python-executor:$(VERSION)
 DOCKER_IMAGE_LATEST := registry.cluster:5000/python-executor:latest
 GO_BUILD_FLAGS := -ldflags="-s -w"
@@ -57,6 +57,13 @@ docker-push: docker-build ## Push Docker image to registry
 	docker push $(DOCKER_IMAGE)
 	@echo "Pushing latest tagged Docker image..."
 	docker push $(DOCKER_IMAGE_LATEST)
+
+
+nomad-restart:
+	@echo "Restarting Nomad service..."
+	@nomad job restart -yes python-executor
+	@echo "Nomad service restarted successfully"
+
 
 run-server: build-server ## Run the server locally
 	@echo "Starting server..."
