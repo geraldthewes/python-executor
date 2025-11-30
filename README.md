@@ -44,7 +44,7 @@ go install github.com/geraldthewes/python-executor/cmd/python-executor@latest
 Basic usage:
 ```bash
 # Run from stdin
-echo 'print("Hello, World!")' | python-executor run
+echo 'print("Hello, World")' | python-executor run
 
 # Run a single file
 python-executor run script.py

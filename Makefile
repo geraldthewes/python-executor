@@ -74,4 +74,8 @@ install-tools: ## Install development tools
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install github.com/swaggo/swag/cmd/swag@latest
 
+
+install:
+	sudo cp -a bin/python-executor /usr/local/bin
+
 .DEFAULT_GOAL := help
