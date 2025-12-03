@@ -56,6 +56,11 @@ job "python-executor" {
         PYEXEC_DEFAULT_CPU_SHARES = "1024"
         PYEXEC_DEFAULT_IMAGE   = "python:3.12-slim"
 
+        # Network mode for execution containers: "host" or "bridge"
+        # Default: host (uses host networking, more reliable)
+        # Use "bridge" for better isolation (requires proper Docker NAT setup)
+        # PYEXEC_NETWORK_MODE  = "host"
+
         # DNS servers for execution containers (comma-separated)
         # Default: 8.8.8.8,8.8.4.4 (Google DNS)
         # PYEXEC_DNS_SERVERS   = "8.8.8.8,8.8.4.4"

@@ -25,8 +25,9 @@ type ServerConfig struct {
 
 // DockerConfig holds Docker client configuration
 type DockerConfig struct {
-	Socket     string
-	DNSServers []string
+	Socket      string
+	DNSServers  []string
+	NetworkMode string // "host" or "bridge" for execution containers
 }
 
 // DefaultsConfig holds default execution parameters
@@ -60,8 +61,9 @@ func Load() *Config {
 			LogLevel: getEnv("PYEXEC_LOG_LEVEL", "info"),
 		},
 		Docker: DockerConfig{
-			Socket:     getEnv("PYEXEC_DOCKER_SOCKET", "/var/run/docker.sock"),
-			DNSServers: getEnvStringSlice("PYEXEC_DNS_SERVERS", []string{"8.8.8.8", "8.8.4.4"}),
+			Socket:      getEnv("PYEXEC_DOCKER_SOCKET", "/var/run/docker.sock"),
+			DNSServers:  getEnvStringSlice("PYEXEC_DNS_SERVERS", []string{"8.8.8.8", "8.8.4.4"}),
+			NetworkMode: getEnv("PYEXEC_NETWORK_MODE", "host"),
 		},
 		Defaults: DefaultsConfig{
 			Timeout:     getEnvInt("PYEXEC_DEFAULT_TIMEOUT", 300),

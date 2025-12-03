@@ -138,7 +138,7 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 	// Network mode
 	networkMode := "none"
 	if !meta.Config.NetworkDisabled {
-		networkMode = "bridge"
+		networkMode = e.config.Docker.NetworkMode
 	}
 
 	// Resource limits
@@ -293,12 +293,6 @@ func applyDefaults(meta *clientpkg.Metadata, cfg *config.Config) *clientpkg.Meta
 	}
 	if meta.Config.CPUShares == 0 {
 		meta.Config.CPUShares = cfg.Defaults.CPUShares
-	}
-
-	// Default to network disabled
-	if meta.Config.NetworkDisabled == false && meta.Config.MemoryMB != 0 {
-		// If config was explicitly provided but network not set, default to true
-		meta.Config.NetworkDisabled = true
 	}
 
 	return meta

@@ -61,7 +61,9 @@ docker-push: docker-build ## Push Docker image to registry
 
 nomad-restart:
 	@echo "Restarting Nomad service..."
-	@nomad job restart -yes python-executor
+	@nomad job stop -yes python-executor
+	@sleep 5
+	@nomad job start python-executor
 	@echo "Nomad service restarted successfully"
 
 
