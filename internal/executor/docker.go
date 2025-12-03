@@ -166,6 +166,7 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 	hostConfig := &container.HostConfig{
 		NetworkMode: container.NetworkMode(networkMode),
 		Resources:   resources,
+		DNS:         e.config.Docker.DNSServers,
 		Tmpfs: map[string]string{
 			"/tmp": "size=100m",
 		},
