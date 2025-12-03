@@ -26,8 +26,9 @@ var (
 	verbose   bool
 
 	// run command flags
-	files      []string
-	entrypoint string
+	files            []string
+	entrypoint       string
+	requirementsFile string
 )
 
 func main() {
@@ -72,6 +73,7 @@ func runCmd() *cobra.Command {
 
 	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
 	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
+	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
 
 	return cmd
 }
@@ -86,6 +88,7 @@ func submitCmd() *cobra.Command {
 
 	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
 	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
+	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
 
 	return cmd
 }
@@ -282,6 +285,15 @@ func prepareExecution(args []string) ([]byte, *client.Metadata, error) {
 			DiskMB:          diskMB,
 			CPUShares:       cpuShares,
 		},
+	}
+
+	// Read requirements file if specified
+	if requirementsFile != "" {
+		reqData, err := os.ReadFile(requirementsFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("reading requirements file: %w", err)
+		}
+		meta.RequirementsTxt = string(reqData)
 	}
 
 	return tarData, meta, nil
