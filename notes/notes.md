@@ -613,3 +613,44 @@ Done! Here's a summary of the fixes:
   You can test against your server with:
   echo 'print("Hello, World!")' | bin/python-executor --server http://pyexec.cluster:9999/ run
 
+ Plan: Add --requirements flag to CLI
+
+ Summary
+
+ Add a --requirements flag to the CLI that reads a requirements.txt file and passes its contents to the server for
+ installation before script execution.
+
+ Key Finding
+
+ The server-side support already exists - the Metadata.RequirementsTxt field and Docker executor handling are implemented. We
+ just need to expose it through the CLI.
+
+ Files to Modify
+
+ 1. cmd/python-executor/main.go
+
+ - Add --requirements flag (string, path to requirements.txt file)
+ - In prepareExecution(), read the requirements file content if flag is provided
+ - Pass the content to meta.RequirementsTxt
+
+ Implementation Steps
+
+ 1. Add flag definition (~line 47 with other flags):
+ requirementsFile = flag.String("requirements", "", "Path to requirements.txt file")
+ 2. Read and set requirements in prepareExecution() (~line 130):
+   - If *requirementsFile != "", read the file content
+   - Set meta.RequirementsTxt = string(content)
+   - Return error if file doesn't exist or can't be read
+
+ Usage After Implementation
+
+ # Run with requirements
+ python-executor run --requirements tests/requirements.txt tests/test.py
+
+ # Also works with other options
+ python-executor run --requirements requirements.txt --timeout 60 ./myproject/
+
+ Estimated Changes
+
+ - ~10 lines of code in main.go
+
