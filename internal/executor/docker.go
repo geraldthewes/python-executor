@@ -151,7 +151,6 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 	containerConfig := &container.Config{
 		Image:        meta.DockerImage,
 		Cmd:          []string{"sh", "-c", cmd},
-		User:         "1000:1000",
 		WorkingDir:   "/work",
 		AttachStdout: true,
 		AttachStderr: true,

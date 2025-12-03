@@ -294,6 +294,15 @@ func prepareExecution(args []string) ([]byte, *client.Metadata, error) {
 			return nil, nil, fmt.Errorf("reading requirements file: %w", err)
 		}
 		meta.RequirementsTxt = string(reqData)
+
+		// Enable network access for pip install
+		if !network {
+			network = true
+			meta.Config.NetworkDisabled = false
+			if !quiet {
+				fmt.Fprintln(os.Stderr, "Network access enabled for package installation")
+			}
+		}
 	}
 
 	return tarData, meta, nil
