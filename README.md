@@ -212,6 +212,10 @@ export PYEXEC_CONSUL_ADDR=consul:8500
 # Defaults
 export PYEXEC_DEFAULT_TIMEOUT=300
 export PYEXEC_DEFAULT_MEMORY_MB=1024
+
+# Docker network settings
+export PYEXEC_NETWORK_MODE=host          # or "bridge"
+export PYEXEC_DNS_SERVERS=8.8.8.8,8.8.4.4
 ```
 
 The `PYEXEC_SERVER` environment variable specifies the base URL of the python-executor server. This can be overridden with the `--server` flag when using the CLI tool.

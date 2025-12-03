@@ -16,6 +16,8 @@ python-executor is configured via environment variables.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PYEXEC_DOCKER_SOCKET` | `/var/run/docker.sock` | Path to Docker socket |
+| `PYEXEC_NETWORK_MODE` | `host` | Network mode for execution containers (`host` or `bridge`) |
+| `PYEXEC_DNS_SERVERS` | `8.8.8.8,8.8.4.4` | DNS servers for execution containers (comma-separated) |
 
 ## Execution Defaults
 
