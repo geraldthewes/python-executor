@@ -3,6 +3,7 @@ module github.com/geraldthewes/python-executor
 go 1.25.4
 
 require (
+	al.essio.dev/pkg/shellescape v1.6.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0

@@ -29,6 +29,7 @@ var (
 	files            []string
 	entrypoint       string
 	requirementsFile string
+	envVars          []string
 )
 
 func main() {
@@ -65,30 +66,38 @@ func main() {
 
 func runCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [file|directory|tar]",
+		Use:   "run [file|directory|tar] [-- script-args...]",
 		Short: "Execute code synchronously",
-		Long:  `Execute Python code and wait for result`,
-		RunE:  runExecution,
+		Long: `Execute Python code and wait for result.
+
+Arguments after -- are passed to the Python script.
+Example: python-executor run script.py -- arg1 arg2`,
+		RunE: runExecution,
 	}
 
 	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
 	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
 	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
+	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable (VAR or VAR=value)")
 
 	return cmd
 }
 
 func submitCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "submit [file|directory|tar]",
+		Use:   "submit [file|directory|tar] [-- script-args...]",
 		Short: "Submit code asynchronously",
-		Long:  `Submit code for execution and return immediately`,
-		RunE:  submitExecution,
+		Long: `Submit code for execution and return immediately.
+
+Arguments after -- are passed to the Python script.
+Example: python-executor submit script.py -- arg1 arg2`,
+		RunE: submitExecution,
 	}
 
 	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
 	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
 	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
+	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable (VAR or VAR=value)")
 
 	return cmd
 }
@@ -123,7 +132,10 @@ func versionCmd() *cobra.Command {
 }
 
 func runExecution(cmd *cobra.Command, args []string) error {
-	tarData, meta, err := prepareExecution(args)
+	// Separate positional args from script args
+	positionalArgs, scriptArgs := splitArgsAtDash(cmd, args)
+
+	tarData, meta, err := prepareExecution(positionalArgs, scriptArgs)
 	if err != nil {
 		return err
 	}
@@ -151,7 +163,10 @@ func runExecution(cmd *cobra.Command, args []string) error {
 }
 
 func submitExecution(cmd *cobra.Command, args []string) error {
-	tarData, meta, err := prepareExecution(args)
+	// Separate positional args from script args
+	positionalArgs, scriptArgs := splitArgsAtDash(cmd, args)
+
+	tarData, meta, err := prepareExecution(positionalArgs, scriptArgs)
 	if err != nil {
 		return err
 	}
@@ -205,8 +220,38 @@ func killExecution(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// splitArgsAtDash separates positional args from script args at the -- separator
+func splitArgsAtDash(cmd *cobra.Command, args []string) ([]string, []string) {
+	dashIdx := cmd.ArgsLenAtDash()
+	if dashIdx == -1 {
+		return args, nil
+	}
+	return args[:dashIdx], args[dashIdx:]
+}
+
+// resolveEnvVars processes --env flags, resolving VAR to VAR=value from environment
+func resolveEnvVars(envFlags []string) ([]string, error) {
+	result := make([]string, 0, len(envFlags))
+
+	for _, env := range envFlags {
+		if strings.Contains(env, "=") {
+			// Explicit value: VAR=value
+			result = append(result, env)
+		} else {
+			// Forward from environment: VAR
+			value, exists := os.LookupEnv(env)
+			if !exists {
+				return nil, fmt.Errorf("environment variable %q not set", env)
+			}
+			result = append(result, fmt.Sprintf("%s=%s", env, value))
+		}
+	}
+
+	return result, nil
+}
+
 // prepareExecution creates tar and metadata from inputs
-func prepareExecution(args []string) ([]byte, *client.Metadata, error) {
+func prepareExecution(args []string, scriptArgs []string) ([]byte, *client.Metadata, error) {
 	var tarData []byte
 	var err error
 
@@ -274,10 +319,18 @@ func prepareExecution(args []string) ([]byte, *client.Metadata, error) {
 		}
 	}
 
+	// Resolve environment variables
+	resolvedEnvVars, err := resolveEnvVars(envVars)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Build metadata
 	meta := &client.Metadata{
 		Entrypoint:  entrypoint,
 		DockerImage: image,
+		EnvVars:     resolvedEnvVars,
+		ScriptArgs:  scriptArgs,
 		Config: &client.ExecutionConfig{
 			TimeoutSeconds:  timeout,
 			NetworkDisabled: !network,

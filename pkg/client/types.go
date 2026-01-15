@@ -15,12 +15,14 @@ const (
 
 // Metadata contains execution parameters
 type Metadata struct {
-	Entrypoint      string         `json:"entrypoint"`
-	DockerImage     string         `json:"docker_image,omitempty"`
-	RequirementsTxt string         `json:"requirements_txt,omitempty"`
-	PreCommands     []string       `json:"pre_commands,omitempty"`
-	Stdin           string         `json:"stdin,omitempty"`
+	Entrypoint      string           `json:"entrypoint"`
+	DockerImage     string           `json:"docker_image,omitempty"`
+	RequirementsTxt string           `json:"requirements_txt,omitempty"`
+	PreCommands     []string         `json:"pre_commands,omitempty"`
+	Stdin           string           `json:"stdin,omitempty"`
 	Config          *ExecutionConfig `json:"config,omitempty"`
+	EnvVars         []string         `json:"env_vars,omitempty"`
+	ScriptArgs      []string         `json:"script_args,omitempty"`
 }
 
 // ExecutionConfig holds resource limits and settings

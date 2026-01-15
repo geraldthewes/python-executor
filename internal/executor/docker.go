@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -154,6 +155,7 @@ func (e *DockerExecutor) createContainer(ctx context.Context, meta *clientpkg.Me
 		WorkingDir:   "/work",
 		AttachStdout: true,
 		AttachStderr: true,
+		Env:          meta.EnvVars,
 	}
 
 	// Add stdin if provided
@@ -205,9 +207,13 @@ func (e *DockerExecutor) buildCommand(meta *clientpkg.Metadata) string {
 		parts = append(parts, fmt.Sprintf("pip install --no-cache-dir -r %s", reqFile))
 	}
 
-	// Run Python script
+	// Run Python script with arguments
 	scriptPath := filepath.Join("/work", meta.Entrypoint)
-	parts = append(parts, fmt.Sprintf("python %s", scriptPath))
+	pythonCmd := fmt.Sprintf("python %s", shellescape.Quote(scriptPath))
+	for _, arg := range meta.ScriptArgs {
+		pythonCmd += " " + shellescape.Quote(arg)
+	}
+	parts = append(parts, pythonCmd)
 
 	return strings.Join(parts, " && ")
 }

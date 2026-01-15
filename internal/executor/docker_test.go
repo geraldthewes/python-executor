@@ -212,3 +212,79 @@ func TestBuildCommand_RequirementsEscapesSingleQuotes(t *testing.T) {
 		t.Errorf("Requirements content should be in command, got: %s", cmd)
 	}
 }
+
+func TestBuildCommand_WithScriptArgs(t *testing.T) {
+	cfg := &config.Config{}
+	executor := &DockerExecutor{config: cfg}
+
+	meta := &client.Metadata{
+		Entrypoint: "main.py",
+		ScriptArgs: []string{"arg1", "arg2"},
+	}
+
+	cmd := executor.buildCommand(meta)
+
+	// Should contain python and entrypoint
+	if !strings.Contains(cmd, "python") {
+		t.Error("Command should contain python")
+	}
+	if !strings.Contains(cmd, "main.py") {
+		t.Error("Command should contain entrypoint")
+	}
+	// Should contain arguments
+	if !strings.Contains(cmd, "arg1") {
+		t.Error("Command should contain arg1")
+	}
+	if !strings.Contains(cmd, "arg2") {
+		t.Error("Command should contain arg2")
+	}
+}
+
+func TestBuildCommand_WithScriptArgsSpecialChars(t *testing.T) {
+	cfg := &config.Config{}
+	executor := &DockerExecutor{config: cfg}
+
+	meta := &client.Metadata{
+		Entrypoint: "main.py",
+		ScriptArgs: []string{"arg with spaces", "--flag=value", "$VAR"},
+	}
+
+	cmd := executor.buildCommand(meta)
+
+	// The argument with spaces should be properly quoted
+	if !strings.Contains(cmd, "'arg with spaces'") {
+		t.Errorf("Argument with spaces should be quoted, got: %s", cmd)
+	}
+	// Flag-style argument should be present
+	if !strings.Contains(cmd, "--flag=value") {
+		t.Errorf("Flag argument should be present, got: %s", cmd)
+	}
+	// $VAR should be quoted to prevent expansion
+	if !strings.Contains(cmd, "'$VAR'") {
+		t.Errorf("$VAR should be quoted to prevent shell expansion, got: %s", cmd)
+	}
+}
+
+func TestBuildCommand_NoScriptArgs(t *testing.T) {
+	cfg := &config.Config{}
+	executor := &DockerExecutor{config: cfg}
+
+	meta := &client.Metadata{
+		Entrypoint: "script.py",
+		ScriptArgs: nil,
+	}
+
+	cmd := executor.buildCommand(meta)
+
+	// Should contain python and script path (may or may not be quoted based on path)
+	if !strings.Contains(cmd, "python") {
+		t.Error("Command should contain python")
+	}
+	if !strings.Contains(cmd, "script.py") {
+		t.Errorf("Command should contain script.py, got: %s", cmd)
+	}
+	// Should not have extra arguments after the script path
+	if strings.Contains(cmd, "arg") {
+		t.Errorf("Command should not have extra arguments, got: %s", cmd)
+	}
+}

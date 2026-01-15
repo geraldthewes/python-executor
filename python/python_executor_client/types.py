@@ -43,6 +43,8 @@ class Metadata:
     pre_commands: Optional[list[str]] = None
     stdin: Optional[str] = None
     config: Optional[ExecutionConfig] = None
+    env_vars: Optional[list[str]] = None
+    script_args: Optional[list[str]] = None
 
     def to_dict(self):
         data = {"entrypoint": self.entrypoint}
@@ -57,6 +59,10 @@ class Metadata:
             data["stdin"] = self.stdin
         if self.config:
             data["config"] = self.config.to_dict()
+        if self.env_vars:
+            data["env_vars"] = self.env_vars
+        if self.script_args:
+            data["script_args"] = self.script_args
 
         return data
 

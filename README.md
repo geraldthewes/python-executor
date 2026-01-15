@@ -14,6 +14,8 @@ A high-performance, self-hosted remote Python execution service designed for sec
 - ⚙️ **Pre-execution Commands** - Run setup commands (apt install, etc.)
 - 🎯 **Resource Limits** - Configurable memory, CPU, disk, and timeout limits
 - 🚫 **Network Isolation** - Network disabled by default for security
+- 🔄 **Environment Variables** - Pass environment variables with `--env`
+- 📋 **Script Arguments** - Pass arguments to scripts with `--` separator
 
 ## Use Cases
 
@@ -54,6 +56,15 @@ python-executor run ./my-project/ --entrypoint main.py
 
 # Run with custom limits
 python-executor run script.py --timeout 600 --memory 2048 --network
+
+# Pass environment variables to the script
+python-executor run script.py --env API_KEY --env DEBUG=true
+
+# Pass arguments to the script (after --)
+python-executor run script.py -- arg1 arg2 --verbose
+
+# Combined: env vars and script arguments
+python-executor run script.py --env SERVICE_HOST -e SERVICE_PORT -- http://host:port
 
 # Async execution
 id=$(python-executor submit long-script.py --async)
@@ -219,6 +230,8 @@ export PYEXEC_DNS_SERVERS=8.8.8.8,8.8.4.4
 ```
 
 The `PYEXEC_SERVER` environment variable specifies the base URL of the python-executor server. This can be overridden with the `--server` flag when using the CLI tool.
+
+**Note on Ports**: The python-executor server defaults to port 8080. If your scripts use frameworks like FastAPI/uvicorn (which default to port 8000), ensure your port configuration is explicit to avoid mismatches.
 
 See [Configuration Guide](docs/configuration.md) for all options.
 
