@@ -2,16 +2,22 @@
 
 Python client library for the python-executor service.
 
+**Use this client library instead of implementing the HTTP API directly.** The API uses
+`multipart/form-data` with tar archives, which this library handles automatically.
+
 ## Installation
 
+Install from the repository:
+
 ```bash
-pip install python-executor-client
+pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python
 ```
 
 Or install from source:
 
 ```bash
-cd python
+git clone https://github.com/geraldthewes/python-executor.git
+cd python-executor/python
 pip install .
 ```
 

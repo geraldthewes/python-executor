@@ -31,16 +31,19 @@ func NewServer(storage storage.Storage, exec executor.Executor) *Server {
 
 // ExecuteSync handles synchronous execution
 // @Summary Execute code synchronously
-// @Description Execute Python code and wait for result
+// @Description Execute Python code and wait for result.
+// @Description
+// @Description IMPORTANT: Use the client libraries instead of calling this directly.
+// @Description The request must be multipart/form-data with a tar archive and metadata JSON.
 // @Tags execution
 // @Accept multipart/form-data
 // @Produce json
-// @Param tar formData file true "Tar archive"
-// @Param metadata formData string true "Execution metadata (JSON)"
-// @Success 200 {object} client.ExecutionResult
-// @Failure 400 {object} gin.H
-// @Failure 500 {object} gin.H
-// @Router /api/v1/exec/sync [post]
+// @Param tar formData file true "Uncompressed tar archive containing Python files"
+// @Param metadata formData string true "Execution metadata as JSON: {\"entrypoint\":\"main.py\",\"config\":{\"timeout_seconds\":300}}"
+// @Success 200 {object} client.ExecutionResult "Execution completed"
+// @Failure 400 {object} gin.H "Invalid request format"
+// @Failure 500 {object} gin.H "Execution failed"
+// @Router /exec/sync [post]
 func (s *Server) ExecuteSync(c *gin.Context) {
 	// Parse multipart form
 	tarData, metadata, err := s.parseRequest(c)
@@ -103,16 +106,19 @@ func (s *Server) ExecuteSync(c *gin.Context) {
 
 // ExecuteAsync handles asynchronous execution
 // @Summary Execute code asynchronously
-// @Description Submit code for execution and return immediately
+// @Description Submit code for execution and return immediately with an execution ID.
+// @Description
+// @Description IMPORTANT: Use the client libraries instead of calling this directly.
+// @Description The request must be multipart/form-data with a tar archive and metadata JSON.
 // @Tags execution
 // @Accept multipart/form-data
 // @Produce json
-// @Param tar formData file true "Tar archive"
-// @Param metadata formData string true "Execution metadata (JSON)"
-// @Success 202 {object} client.AsyncResponse
-// @Failure 400 {object} gin.H
-// @Failure 500 {object} gin.H
-// @Router /api/v1/exec/async [post]
+// @Param tar formData file true "Uncompressed tar archive containing Python files"
+// @Param metadata formData string true "Execution metadata as JSON: {\"entrypoint\":\"main.py\"}"
+// @Success 202 {object} client.AsyncResponse "Execution submitted"
+// @Failure 400 {object} gin.H "Invalid request format"
+// @Failure 500 {object} gin.H "Failed to create execution"
+// @Router /exec/async [post]
 func (s *Server) ExecuteAsync(c *gin.Context) {
 	// Parse multipart form
 	tarData, metadata, err := s.parseRequest(c)
@@ -148,14 +154,14 @@ func (s *Server) ExecuteAsync(c *gin.Context) {
 
 // GetExecution retrieves execution status
 // @Summary Get execution status
-// @Description Retrieve the status and result of an execution
+// @Description Retrieve the status and result of an execution.
+// @Description Status values: pending, running, completed, failed, killed
 // @Tags execution
 // @Produce json
-// @Param id path string true "Execution ID"
-// @Success 200 {object} client.ExecutionResult
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
-// @Router /api/v1/executions/{id} [get]
+// @Param id path string true "Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)"
+// @Success 200 {object} client.ExecutionResult "Execution status and result"
+// @Failure 404 {object} gin.H "Execution not found"
+// @Router /executions/{id} [get]
 func (s *Server) GetExecution(c *gin.Context) {
 	id := c.Param("id")
 
@@ -170,14 +176,15 @@ func (s *Server) GetExecution(c *gin.Context) {
 
 // KillExecution terminates a running execution
 // @Summary Kill execution
-// @Description Terminate a running execution
+// @Description Terminate a running execution.
+// @Description If the execution is not running, returns the current status.
 // @Tags execution
 // @Produce json
-// @Param id path string true "Execution ID"
-// @Success 200 {object} client.KillResponse
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
-// @Router /api/v1/executions/{id} [delete]
+// @Param id path string true "Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)"
+// @Success 200 {object} client.KillResponse "Execution killed or current status"
+// @Failure 404 {object} gin.H "Execution not found"
+// @Failure 500 {object} gin.H "Failed to kill execution"
+// @Router /executions/{id} [delete]
 func (s *Server) KillExecution(c *gin.Context) {
 	id := c.Param("id")
 

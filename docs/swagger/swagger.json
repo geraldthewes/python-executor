@@ -1,0 +1,267 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Remote Python code execution service.\n\nIMPORTANT: Use the client libraries instead of implementing this API directly.\nThe API uses multipart/form-data with tar archives, which is complex to implement correctly.\n\nPython: pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python\nGo: go get github.com/geraldthewes/python-executor/pkg/client",
+        "title": "python-executor API",
+        "contact": {
+            "name": "python-executor",
+            "url": "https://github.com/geraldthewes/python-executor"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/exec/async": {
+            "post": {
+                "description": "Submit code for execution and return immediately with an execution ID.\n\nIMPORTANT: Use the client libraries instead of calling this directly.\nThe request must be multipart/form-data with a tar archive and metadata JSON.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Execute code asynchronously",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Uncompressed tar archive containing Python files",
+                        "name": "tar",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Execution metadata as JSON: {\\",
+                        "name": "metadata",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Execution submitted",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.AsyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create execution",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/exec/sync": {
+            "post": {
+                "description": "Execute Python code and wait for result.\n\nIMPORTANT: Use the client libraries instead of calling this directly.\nThe request must be multipart/form-data with a tar archive and metadata JSON.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Execute code synchronously",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Uncompressed tar archive containing Python files",
+                        "name": "tar",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Execution metadata as JSON: {\\",
+                        "name": "metadata",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution completed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Execution failed",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
+        "/executions/{id}": {
+            "get": {
+                "description": "Retrieve the status and result of an execution.\nStatus values: pending, running, completed, failed, killed",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Get execution status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution status and result",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult"
+                        }
+                    },
+                    "404": {
+                        "description": "Execution not found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Terminate a running execution.\nIf the execution is not running, returns the current status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Kill execution",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution killed or current status",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.KillResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Execution not found",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to kill execution",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "gin.H": {
+            "type": "object",
+            "additionalProperties": {}
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.AsyncResponse": {
+            "type": "object",
+            "properties": {
+                "execution_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.ExecutionResult": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionStatus"
+                },
+                "stderr": {
+                    "type": "string"
+                },
+                "stdout": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.ExecutionStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "failed",
+                "killed"
+            ],
+            "x-enum-varnames": [
+                "StatusPending",
+                "StatusRunning",
+                "StatusCompleted",
+                "StatusFailed",
+                "StatusKilled"
+            ]
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.KillResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -1,4 +1,4 @@
-.PHONY: help build build-server build-cli test test-unit test-integration lint clean docker-build docker-push run-server install-tools
+.PHONY: help build build-server build-cli test test-unit test-integration lint clean docker-build docker-push run-server install-tools swagger
 
 # Build configuration
 BINARY_SERVER := bin/python-executor-server
@@ -17,7 +17,11 @@ help: ## Show this help message
 
 build: build-server build-cli ## Build both server and CLI
 
-build-server: ## Build the API server
+swagger: ## Generate Swagger documentation
+	@echo "Generating Swagger docs..."
+	@swag init -g cmd/server/main.go -o docs/swagger --parseDependency --parseInternal
+
+build-server: swagger ## Build the API server
 	@echo "Building server..."
 	@mkdir -p bin
 	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_FLAGS) -o $(BINARY_SERVER) ./cmd/server

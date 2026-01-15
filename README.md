@@ -9,7 +9,7 @@ A high-performance, self-hosted remote Python execution service designed for sec
 - ⚡ **Sync & Async** - Both synchronous and asynchronous execution modes
 - 🌐 **Multiple Interfaces** - REST API, Go client, Python client, and CLI tool
 - 🔌 **Consul Integration** - Optional distributed state storage with in-memory fallback
-- 📝 **OpenAPI Ready** - Self-documenting API with Swagger UI
+- 📝 **API Documentation** - Complete API reference with Swagger UI at `/docs`
 - 🐍 **Custom Requirements** - Install dependencies via requirements.txt
 - ⚙️ **Pre-execution Commands** - Run setup commands (apt install, etc.)
 - 🎯 **Resource Limits** - Configurable memory, CPU, disk, and timeout limits
@@ -24,6 +24,24 @@ A high-performance, self-hosted remote Python execution service designed for sec
 - Internal automation and data-processing microservices
 - CI/CD code generation steps
 - Remote script execution for distributed systems
+
+## For AI Code Agents
+
+If you are an AI agent integrating with python-executor, **use the client libraries** instead of implementing the HTTP protocol directly:
+
+**Python:**
+```bash
+pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python
+```
+
+**Go:**
+```bash
+go get github.com/geraldthewes/python-executor/pkg/client
+```
+
+The raw HTTP API uses `multipart/form-data` with tar archives, which is complex to implement correctly. The client libraries handle tar creation, metadata encoding, and response parsing automatically.
+
+See [API Reference](docs/api.md) for complete documentation.
 
 ## Quick Start
 
@@ -113,10 +131,9 @@ func main() {
 
 ### Using the Python Client
 
-Install:
+Install from repository:
 ```bash
-cd python
-pip install .
+pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python
 ```
 
 Usage:
@@ -144,7 +161,7 @@ print(f"Exit code: {result.exit_code}")
 | DELETE | `/api/v1/executions/{id}` | Kill a running execution |
 | GET | `/health` | Health check endpoint |
 
-See [API Documentation](docs/api.md) for detailed API specs.
+See [API Documentation](docs/api.md) for detailed API specs. **Note:** Use client libraries instead of implementing the HTTP protocol directly.
 
 ## Building from Source
 
@@ -250,6 +267,7 @@ python-executor uses multiple security layers:
 
 ## Documentation
 
+- [API Reference](docs/api.md) - Complete API specification (use client libraries instead of raw HTTP)
 - [Configuration](docs/configuration.md) - Environment variables and settings
 - [Security](docs/security.md) - Security considerations and best practices
 - [Examples](docs/examples.md) - Usage examples for all interfaces

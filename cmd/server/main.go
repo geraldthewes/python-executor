@@ -1,3 +1,22 @@
+// @title           python-executor API
+// @version         1.0
+// @description     Remote Python code execution service.
+// @description
+// @description     IMPORTANT: Use the client libraries instead of implementing this API directly.
+// @description     The API uses multipart/form-data with tar archives, which is complex to implement correctly.
+// @description
+// @description     Python: pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python
+// @description     Go: go get github.com/geraldthewes/python-executor/pkg/client
+
+// @contact.name   python-executor
+// @contact.url    https://github.com/geraldthewes/python-executor
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
 package main
 
 import (

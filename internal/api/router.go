@@ -3,6 +3,10 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/geraldthewes/python-executor/docs/swagger"
 )
 
 // SetupRouter creates and configures the Gin router
@@ -34,7 +38,8 @@ func SetupRouter(server *Server, logger *logrus.Logger) *gin.Engine {
 		v1.DELETE("/executions/:id", server.KillExecution)
 	}
 
-	// TODO: Add Swagger docs at /docs
+	// Swagger documentation
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return router
 }

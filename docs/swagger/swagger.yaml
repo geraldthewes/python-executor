@@ -1,0 +1,199 @@
+basePath: /api/v1
+definitions:
+  gin.H:
+    additionalProperties: {}
+    type: object
+  github_com_geraldthewes_python-executor_pkg_client.AsyncResponse:
+    properties:
+      execution_id:
+        type: string
+    type: object
+  github_com_geraldthewes_python-executor_pkg_client.ExecutionResult:
+    properties:
+      duration_ms:
+        type: integer
+      error:
+        type: string
+      execution_id:
+        type: string
+      exit_code:
+        type: integer
+      finished_at:
+        type: string
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionStatus'
+      stderr:
+        type: string
+      stdout:
+        type: string
+    type: object
+  github_com_geraldthewes_python-executor_pkg_client.ExecutionStatus:
+    enum:
+    - pending
+    - running
+    - completed
+    - failed
+    - killed
+    type: string
+    x-enum-varnames:
+    - StatusPending
+    - StatusRunning
+    - StatusCompleted
+    - StatusFailed
+    - StatusKilled
+  github_com_geraldthewes_python-executor_pkg_client.KillResponse:
+    properties:
+      status:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: python-executor
+    url: https://github.com/geraldthewes/python-executor
+  description: |-
+    Remote Python code execution service.
+
+    IMPORTANT: Use the client libraries instead of implementing this API directly.
+    The API uses multipart/form-data with tar archives, which is complex to implement correctly.
+
+    Python: pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory=python
+    Go: go get github.com/geraldthewes/python-executor/pkg/client
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: python-executor API
+  version: "1.0"
+paths:
+  /exec/async:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Submit code for execution and return immediately with an execution ID.
+
+        IMPORTANT: Use the client libraries instead of calling this directly.
+        The request must be multipart/form-data with a tar archive and metadata JSON.
+      parameters:
+      - description: Uncompressed tar archive containing Python files
+        in: formData
+        name: tar
+        required: true
+        type: file
+      - description: 'Execution metadata as JSON: {\'
+        in: formData
+        name: metadata
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Execution submitted
+          schema:
+            $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.AsyncResponse'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Failed to create execution
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Execute code asynchronously
+      tags:
+      - execution
+  /exec/sync:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Execute Python code and wait for result.
+
+        IMPORTANT: Use the client libraries instead of calling this directly.
+        The request must be multipart/form-data with a tar archive and metadata JSON.
+      parameters:
+      - description: Uncompressed tar archive containing Python files
+        in: formData
+        name: tar
+        required: true
+        type: file
+      - description: 'Execution metadata as JSON: {\'
+        in: formData
+        name: metadata
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution completed
+          schema:
+            $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Execution failed
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Execute code synchronously
+      tags:
+      - execution
+  /executions/{id}:
+    delete:
+      description: |-
+        Terminate a running execution.
+        If the execution is not running, returns the current status.
+      parameters:
+      - description: Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution killed or current status
+          schema:
+            $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.KillResponse'
+        "404":
+          description: Execution not found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Failed to kill execution
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Kill execution
+      tags:
+      - execution
+    get:
+      description: |-
+        Retrieve the status and result of an execution.
+        Status values: pending, running, completed, failed, killed
+      parameters:
+      - description: Execution ID (e.g., exe_550e8400-e29b-41d4-a716-446655440000)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution status and result
+          schema:
+            $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult'
+        "404":
+          description: Execution not found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get execution status
+      tags:
+      - execution
+swagger: "2.0"
