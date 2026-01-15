@@ -59,12 +59,19 @@ docker-push: docker-build ## Push Docker image to registry
 	docker push $(DOCKER_IMAGE_LATEST)
 
 
-nomad-restart:
+nomad-restart: ## Restart the Nomad service
 	@echo "Restarting Nomad service..."
 	@nomad job stop -yes python-executor
 	@sleep 5
 	@nomad job start python-executor
 	@echo "Nomad service restarted successfully"
+
+health-check: ## Check health of deployed service
+	@curl -sf http://pyexec.cluster:9999/health && echo "Service is healthy" || (echo "Service is unhealthy" && exit 1)
+
+smoke-test: health-check ## Run smoke test (health check + execute Python)
+	@echo "Testing Python execution..."
+	@echo 'print("hello world")' | $(BINARY_CLI) run | grep -q "hello world" && echo "Smoke test passed" || (echo "Smoke test failed" && exit 1)
 
 
 run-server: build-server ## Run the server locally

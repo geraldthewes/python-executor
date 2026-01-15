@@ -36,7 +36,10 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:   "python-executor",
 		Short: "Remote Python code execution CLI",
-		Long:  `Execute Python code remotely in isolated containers`,
+		Long: `Execute Python code remotely in isolated containers.
+
+Documentation:     https://github.com/geraldthewes/python-executor/blob/main/README.md
+Configuration:     https://github.com/geraldthewes/python-executor/blob/main/docs/configuration.md`,
 	}
 
 	// Global flags
