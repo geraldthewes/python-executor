@@ -27,7 +27,36 @@ A high-performance, self-hosted remote Python execution service designed for sec
 
 ## For AI Code Agents
 
-If you are an AI agent integrating with python-executor, **use the client libraries** instead of implementing the HTTP protocol directly:
+Two integration approaches are available:
+
+### Option A: Simple JSON API (Recommended for most AI agents)
+
+Use `POST /api/v1/eval` with plain JSON — no tar archives or multipart encoding needed.
+
+```bash
+# Single script
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(\"Hello, World!\")"}'
+
+# Multiple files
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{
+    "files": [
+      {"name": "main.py", "content": "from helper import greet\ngreet()"},
+      {"name": "helper.py", "content": "def greet(): print(\"Hello!\")"}
+    ],
+    "entrypoint": "main.py"
+  }'
+```
+
+**Best for:** Simple scripts, quick evaluations, LLM tool-calling
+**Limitation:** 100KB total code size
+
+### Option B: Client Libraries
+
+For large projects or complex file structures, use the client libraries which handle tar archives automatically.
 
 **Python:**
 ```bash
@@ -39,7 +68,7 @@ pip install git+https://github.com/geraldthewes/python-executor.git#subdirectory
 go get github.com/geraldthewes/python-executor/pkg/client
 ```
 
-The raw HTTP API uses `multipart/form-data` with tar archives, which is complex to implement correctly. The client libraries handle tar creation, metadata encoding, and response parsing automatically.
+**Best for:** Large projects, complex file structures, multi-MB codebases
 
 See [API Reference](docs/api.md) for complete documentation.
 
@@ -155,6 +184,7 @@ print(f"Exit code: {result.exit_code}")
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| POST | `/api/v1/eval` | Execute code via simple JSON (AI-friendly) |
 | POST | `/api/v1/exec/sync` | Execute code synchronously |
 | POST | `/api/v1/exec/async` | Submit code for async execution |
 | GET | `/api/v1/executions/{id}` | Get execution status and result |
