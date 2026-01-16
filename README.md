@@ -1,6 +1,12 @@
 # python-executor
 
-A high-performance, self-hosted remote Python execution service designed for secure, isolated, and reproducible execution of untrusted or ad-hoc Python code — from single scripts to multi-gigabyte ML projects.
+### Secure Remote Python Code Execution Sandbox for AI Agents & Automation
+
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://hub.docker.com/)
+
+A high-performance, self-hosted remote Python execution service designed for secure, isolated, and reproducible execution of untrusted or ad-hoc Python code — from single scripts to multi-gigabyte ML projects. Perfect as a **code interpreter** for LLMs, AI agents, and automation workflows.
 
 ## Features
 
@@ -17,15 +23,9 @@ A high-performance, self-hosted remote Python execution service designed for sec
 - 🔄 **Environment Variables** - Pass environment variables with `--env`
 - 📋 **Script Arguments** - Pass arguments to scripts with `--` separator
 
-## Use Cases
+## LLM & AI Agent Integration
 
-- AI agent tool-calling (MCP servers, LLM function calling)
-- Secure online judges and education platforms
-- Internal automation and data-processing microservices
-- CI/CD code generation steps
-- Remote script execution for distributed systems
-
-## For AI Code Agents
+Designed as a **code interpreter** and **Python sandbox** for AI systems. Supports **LLM tool-calling**, **function calling**, and is **MCP server compatible**.
 
 Two integration approaches are available:
 
@@ -109,6 +109,22 @@ Both approaches return the same response format:
 ```
 
 See [API Reference](docs/api.md) for complete documentation.
+
+## Use Cases
+
+- AI agent tool-calling (MCP servers, LLM function calling)
+- Secure online judges and education platforms
+- Internal automation and data-processing microservices
+- CI/CD code generation steps
+- Remote script execution for distributed systems
+
+## Why python-executor?
+
+- **Nomad-native deployment** - First-class support for HashiCorp Nomad orchestration
+- **Self-hosted** - No cloud dependency, run on your own infrastructure
+- **Multiple interfaces** - REST API, CLI, Go client, and Python client
+- **Production-ready** - Built-in resource limits, security isolation, and monitoring
+- **AI-first design** - Simple JSON API designed specifically for LLM integration
 
 ## Quick Start
 
