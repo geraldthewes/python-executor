@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +19,49 @@ import (
 	"github.com/geraldthewes/python-executor/internal/storage"
 	"github.com/geraldthewes/python-executor/pkg/client"
 )
+
+// pythonVersionImages maps python_version values to Docker images
+var pythonVersionImages = map[string]string{
+	"3.10": "python:3.10-slim",
+	"3.11": "python:3.11-slim",
+	"3.12": "python:3.12-slim",
+	"3.13": "python:3.13-slim",
+}
+
+// pythonErrorPattern matches Python error lines like 'File "main.py", line 5'
+var pythonErrorLinePattern = regexp.MustCompile(`File ".*", line (\d+)`)
+
+// pythonErrorTypePattern matches Python error types like 'SyntaxError:', 'NameError:'
+var pythonErrorTypePattern = regexp.MustCompile(`^([A-Z][a-zA-Z]*Error):`)
+
+// parseErrorFromStderr extracts error type and line number from Python stderr
+func parseErrorFromStderr(stderr string) (errorType string, errorLine int) {
+	lines := strings.Split(stderr, "\n")
+
+	// Search for error type (usually on the last non-empty line)
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		if matches := pythonErrorTypePattern.FindStringSubmatch(line); len(matches) > 1 {
+			errorType = matches[1]
+			break
+		}
+	}
+
+	// Search for line number
+	for _, line := range lines {
+		if matches := pythonErrorLinePattern.FindStringSubmatch(line); len(matches) > 1 {
+			if n, err := strconv.Atoi(matches[1]); err == nil {
+				errorLine = n
+				break
+			}
+		}
+	}
+
+	return errorType, errorLine
+}
 
 // Server holds the API dependencies
 type Server struct {
@@ -326,6 +372,19 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 		return
 	}
 
+	// Validate and resolve Python version to Docker image
+	var dockerImage string
+	if req.PythonVersion != "" {
+		var ok bool
+		dockerImage, ok = pythonVersionImages[req.PythonVersion]
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("unsupported python_version %q; supported versions: 3.10, 3.11, 3.12, 3.13", req.PythonVersion),
+			})
+			return
+		}
+	}
+
 	// Build files list
 	var files []client.CodeFile
 	if len(req.Files) > 0 {
@@ -366,9 +425,10 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 
 	// Build metadata
 	metadata := &client.Metadata{
-		Entrypoint: entrypoint,
-		Stdin:      req.Stdin,
-		Config:     req.Config,
+		Entrypoint:  entrypoint,
+		Stdin:       req.Stdin,
+		Config:      req.Config,
+		DockerImage: dockerImage,
 	}
 
 	// Generate execution ID
@@ -415,6 +475,11 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 		exec.Stderr = output.Stderr
 		exec.ExitCode = output.ExitCode
 		exec.DurationMs = output.DurationMs
+
+		// Parse error details from stderr if there was an error (non-zero exit code)
+		if output.ExitCode != 0 && output.Stderr != "" {
+			exec.ErrorType, exec.ErrorLine = parseErrorFromStderr(output.Stderr)
+		}
 	}
 
 	s.storage.Update(c.Request.Context(), exec)

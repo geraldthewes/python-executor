@@ -31,6 +31,27 @@ These values are used when not specified in the request metadata:
 | `PYEXEC_DEFAULT_CPU_SHARES` | `1024` | Default CPU shares |
 | `PYEXEC_DEFAULT_IMAGE` | `python:3.12-slim` | Default Docker image |
 
+## Supported Python Versions
+
+The `/api/v1/eval` endpoint supports selecting a Python version via the `python_version` field:
+
+| Version | Docker Image | Notes |
+|---------|--------------|-------|
+| `3.10` | `python:3.10-slim` | Oldest supported version |
+| `3.11` | `python:3.11-slim` | |
+| `3.12` | `python:3.12-slim` | **Default** |
+| `3.13` | `python:3.13-slim` | Latest stable version |
+
+**Example usage:**
+```json
+{
+  "code": "import sys; print(sys.version)",
+  "python_version": "3.11"
+}
+```
+
+**Note:** The sandbox environment includes only the Python standard library by default. External packages are not available unless using the full API with `requirements_txt`.
+
 ## Consul Configuration (Optional)
 
 | Variable | Default | Description |

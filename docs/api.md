@@ -135,6 +135,92 @@ The `metadata` field must be a JSON string with the following structure:
 
 ## Endpoints
 
+### POST /api/v1/eval
+
+Execute code using a simple JSON interface. This endpoint is designed for AI agents and simple integrations.
+
+**Request:**
+- Content-Type: `application/json`
+
+**Request Body:**
+
+```json
+{
+  "code": "print('Hello, World!')",
+  "python_version": "3.12",
+  "stdin": "input data",
+  "config": {
+    "timeout_seconds": 30
+  }
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `code` | string | No* | - | Python code to execute (creates `main.py`) |
+| `files` | array | No* | - | Multiple files with `name` and `content` |
+| `entrypoint` | string | No | `main.py` or first file | File to execute |
+| `stdin` | string | No | - | Standard input to provide |
+| `python_version` | string | No | `3.12` | Python version: `3.10`, `3.11`, `3.12`, `3.13` |
+| `config.timeout_seconds` | int | No | 300 | Maximum execution time |
+
+\* Either `code` or `files` must be provided.
+
+**Multi-file Example:**
+
+```json
+{
+  "files": [
+    {"name": "main.py", "content": "from helper import greet\ngreet()"},
+    {"name": "helper.py", "content": "def greet(): print('Hello!')"}
+  ],
+  "entrypoint": "main.py",
+  "python_version": "3.11"
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "execution_id": "exe_550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "stdout": "Hello, World!\n",
+  "stderr": "",
+  "exit_code": 0,
+  "duration_ms": 150
+}
+```
+
+**Error Response (with structured error fields):**
+
+When Python code fails with an error, the response includes parsed error information:
+
+```json
+{
+  "execution_id": "exe_550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"main.py\", line 1, in <module>\n    print(undefined_var)\nNameError: name 'undefined_var' is not defined\n",
+  "exit_code": 1,
+  "error_type": "NameError",
+  "error_line": 1,
+  "duration_ms": 120
+}
+```
+
+| Error Field | Description |
+|-------------|-------------|
+| `error_type` | Python exception type (e.g., `SyntaxError`, `NameError`, `TypeError`) |
+| `error_line` | Line number where the error occurred |
+
+**Errors:**
+- `400 Bad Request` - Invalid request format or unsupported Python version
+- `413 Request Entity Too Large` - Code exceeds 100KB limit
+- `500 Internal Server Error` - Execution failed
+
+---
+
 ### POST /api/v1/exec/sync
 
 Execute code synchronously and wait for the result.
@@ -267,11 +353,18 @@ Health check endpoint.
   "stderr": "string",
   "exit_code": 0,
   "error": "string (only if failed)",
+  "error_type": "string (e.g., SyntaxError, NameError)",
+  "error_line": 0,
   "started_at": "ISO 8601 timestamp",
   "finished_at": "ISO 8601 timestamp",
   "duration_ms": 0
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `error_type` | Python exception type extracted from stderr (e.g., `SyntaxError`, `NameError`, `TypeError`). Only present when `exit_code != 0`. |
+| `error_line` | Line number where the error occurred, extracted from Python traceback. Only present when `exit_code != 0`. |
 
 ### Error Response
 

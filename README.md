@@ -39,6 +39,16 @@ curl -X POST http://localhost:8080/api/v1/eval \
   -H "Content-Type: application/json" \
   -d '{"code": "print(\"Hello, World!\")"}'
 
+# With specific Python version
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "import sys; print(sys.version)", "python_version": "3.11"}'
+
+# With timeout configuration
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(\"Hello\")", "config": {"timeout_seconds": 30}}'
+
 # Multiple files
 curl -X POST http://localhost:8080/api/v1/eval \
   -H "Content-Type: application/json" \
@@ -50,6 +60,8 @@ curl -X POST http://localhost:8080/api/v1/eval \
     "entrypoint": "main.py"
   }'
 ```
+
+**Supported Python versions:** 3.10, 3.11, 3.12 (default), 3.13
 
 **Best for:** Simple scripts, quick evaluations, LLM tool-calling
 **Limitation:** 100KB total code size
@@ -73,12 +85,26 @@ go get github.com/geraldthewes/python-executor/pkg/client
 Both approaches return the same response format:
 ```json
 {
-  "id": "exe_...",
+  "execution_id": "exe_...",
   "status": "completed",
   "stdout": "Hello, World!\n",
   "stderr": "",
   "exit_code": 0,
   "duration_ms": 150
+}
+```
+
+**Error responses include structured error information:**
+```json
+{
+  "execution_id": "exe_...",
+  "status": "completed",
+  "stdout": "",
+  "stderr": "Traceback...\nNameError: name 'x' is not defined",
+  "exit_code": 1,
+  "error_type": "NameError",
+  "error_line": 1,
+  "duration_ms": 120
 }
 ```
 

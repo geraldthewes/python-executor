@@ -16,6 +16,8 @@ type Execution struct {
 	Stderr      string
 	ExitCode    int
 	Error       string
+	ErrorType   string // Python error type (e.g., "SyntaxError", "NameError")
+	ErrorLine   int    // Line number where error occurred
 	StartedAt   *time.Time
 	FinishedAt  *time.Time
 	DurationMs  int64
@@ -56,6 +58,8 @@ func (e *Execution) ToExecutionResult() *client.ExecutionResult {
 		Stderr:      e.Stderr,
 		ExitCode:    e.ExitCode,
 		Error:       e.Error,
+		ErrorType:   e.ErrorType,
+		ErrorLine:   e.ErrorLine,
 		StartedAt:   e.StartedAt,
 		FinishedAt:  e.FinishedAt,
 		DurationMs:  e.DurationMs,

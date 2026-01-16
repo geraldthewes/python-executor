@@ -92,6 +92,87 @@ func TestBuildTarFromFiles(t *testing.T) {
 	}
 }
 
+func TestParseErrorFromStderr(t *testing.T) {
+	tests := []struct {
+		name          string
+		stderr        string
+		wantErrorType string
+		wantErrorLine int
+	}{
+		{
+			name: "NameError",
+			stderr: `Traceback (most recent call last):
+  File "main.py", line 1, in <module>
+    print(undefined_var)
+NameError: name 'undefined_var' is not defined`,
+			wantErrorType: "NameError",
+			wantErrorLine: 1,
+		},
+		{
+			name: "SyntaxError",
+			stderr: `  File "main.py", line 3
+    if True
+          ^
+SyntaxError: expected ':'`,
+			wantErrorType: "SyntaxError",
+			wantErrorLine: 3,
+		},
+		{
+			name: "TypeError",
+			stderr: `Traceback (most recent call last):
+  File "main.py", line 5, in <module>
+    result = add(1, "two")
+TypeError: unsupported operand type(s) for +: 'int' and 'str'`,
+			wantErrorType: "TypeError",
+			wantErrorLine: 5,
+		},
+		{
+			name: "IndexError with nested calls",
+			stderr: `Traceback (most recent call last):
+  File "main.py", line 10, in <module>
+    main()
+  File "main.py", line 7, in main
+    print(items[5])
+IndexError: list index out of range`,
+			wantErrorType: "IndexError",
+			wantErrorLine: 10, // First line number found
+		},
+		{
+			name:          "empty stderr",
+			stderr:        "",
+			wantErrorType: "",
+			wantErrorLine: 0,
+		},
+		{
+			name:          "no error pattern",
+			stderr:        "Some random output without error patterns",
+			wantErrorType: "",
+			wantErrorLine: 0,
+		},
+		{
+			name: "ValueError",
+			stderr: `Traceback (most recent call last):
+  File "main.py", line 2, in <module>
+    x = int("not a number")
+ValueError: invalid literal for int() with base 10: 'not a number'`,
+			wantErrorType: "ValueError",
+			wantErrorLine: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errorType, errorLine := parseErrorFromStderr(tt.stderr)
+			if errorType != tt.wantErrorType {
+				t.Errorf("errorType = %q, want %q", errorType, tt.wantErrorType)
+			}
+			if errorLine != tt.wantErrorLine {
+				t.Errorf("errorLine = %d, want %d", errorLine, tt.wantErrorLine)
+			}
+		})
+	}
+}
+
 func TestExecuteEval_Validation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -121,6 +202,15 @@ func TestExecuteEval_Validation(t *testing.T) {
 			},
 			wantStatus: http.StatusRequestEntityTooLarge,
 			wantErr:    "exceeds limit",
+		},
+		{
+			name: "invalid python version",
+			body: client.SimpleExecRequest{
+				Code:          "print('hi')",
+				PythonVersion: "2.7",
+			},
+			wantStatus: http.StatusBadRequest,
+			wantErr:    "unsupported python_version",
 		},
 	}
 

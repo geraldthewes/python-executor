@@ -42,6 +42,8 @@ type ExecutionResult struct {
 	Stderr      string          `json:"stderr,omitempty"`
 	ExitCode    int             `json:"exit_code,omitempty"`
 	Error       string          `json:"error,omitempty"`
+	ErrorType   string          `json:"error_type,omitempty"`  // Python error type (e.g., "SyntaxError", "NameError")
+	ErrorLine   int             `json:"error_line,omitempty"`  // Line number where error occurred
 	StartedAt   *time.Time      `json:"started_at,omitempty"`
 	FinishedAt  *time.Time      `json:"finished_at,omitempty"`
 	DurationMs  int64           `json:"duration_ms,omitempty"`
@@ -76,6 +78,10 @@ type SimpleExecRequest struct {
 
 	// Config contains execution resource limits
 	Config *ExecutionConfig `json:"config,omitempty"`
+
+	// PythonVersion specifies the Python version to use (e.g., "3.10", "3.11", "3.12", "3.13")
+	// If not specified, uses the server default (typically 3.12)
+	PythonVersion string `json:"python_version,omitempty"`
 }
 
 // CodeFile represents a single file with its content
