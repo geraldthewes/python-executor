@@ -70,6 +70,18 @@ go get github.com/geraldthewes/python-executor/pkg/client
 
 **Best for:** Large projects, complex file structures, multi-MB codebases
 
+Both approaches return the same response format:
+```json
+{
+  "id": "exe_...",
+  "status": "completed",
+  "stdout": "Hello, World!\n",
+  "stderr": "",
+  "exit_code": 0,
+  "duration_ms": 150
+}
+```
+
 See [API Reference](docs/api.md) for complete documentation.
 
 ## Quick Start
