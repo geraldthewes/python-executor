@@ -22,6 +22,58 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/eval": {
+            "post": {
+                "description": "Execute Python code using a simple JSON interface.\nThis endpoint is designed for AI agents and simple integrations.\n\nTwo modes are supported:\n- Single file: provide \"code\" field with Python code\n- Multi-file: provide \"files\" array with name/content pairs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Execute code via JSON (simplified API)",
+                "parameters": [
+                    {
+                        "description": "Execution request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.SimpleExecRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution completed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "413": {
+                        "description": "Code size exceeds limit",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    },
+                    "500": {
+                        "description": "Execution failed",
+                        "schema": {
+                            "$ref": "#/definitions/gin.H"
+                        }
+                    }
+                }
+            }
+        },
         "/exec/async": {
             "post": {
                 "description": "Submit code for execution and return immediately with an execution ID.\n\nIMPORTANT: Use the client libraries instead of calling this directly.\nThe request must be multipart/form-data with a tar archive and metadata JSON.",
@@ -212,6 +264,39 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_geraldthewes_python-executor_pkg_client.CodeFile": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "file content",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "filename (e.g., \"main.py\")",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.ExecutionConfig": {
+            "type": "object",
+            "properties": {
+                "cpu_shares": {
+                    "type": "integer"
+                },
+                "disk_mb": {
+                    "type": "integer"
+                },
+                "memory_mb": {
+                    "type": "integer"
+                },
+                "network_disabled": {
+                    "type": "boolean"
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_geraldthewes_python-executor_pkg_client.ExecutionResult": {
             "type": "object",
             "properties": {
@@ -265,6 +350,38 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_geraldthewes_python-executor_pkg_client.SimpleExecRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code is the source code to execute (for single-file execution)\nIf provided, creates a main.py with this content",
+                    "type": "string"
+                },
+                "config": {
+                    "description": "Config contains execution resource limits",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionConfig"
+                        }
+                    ]
+                },
+                "entrypoint": {
+                    "description": "Entrypoint is the file to execute (defaults to \"main.py\")",
+                    "type": "string"
+                },
+                "files": {
+                    "description": "Files allows multiple files to be provided (Piston-compatible)\nTakes precedence over Code if both are provided",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_geraldthewes_python-executor_pkg_client.CodeFile"
+                    }
+                },
+                "stdin": {
+                    "description": "Stdin is the standard input to provide to the script",
                     "type": "string"
                 }
             }

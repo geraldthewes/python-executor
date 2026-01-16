@@ -8,6 +8,28 @@ definitions:
       execution_id:
         type: string
     type: object
+  github_com_geraldthewes_python-executor_pkg_client.CodeFile:
+    properties:
+      content:
+        description: file content
+        type: string
+      name:
+        description: filename (e.g., "main.py")
+        type: string
+    type: object
+  github_com_geraldthewes_python-executor_pkg_client.ExecutionConfig:
+    properties:
+      cpu_shares:
+        type: integer
+      disk_mb:
+        type: integer
+      memory_mb:
+        type: integer
+      network_disabled:
+        type: boolean
+      timeout_seconds:
+        type: integer
+    type: object
   github_com_geraldthewes_python-executor_pkg_client.ExecutionResult:
     properties:
       duration_ms:
@@ -48,6 +70,31 @@ definitions:
       status:
         type: string
     type: object
+  github_com_geraldthewes_python-executor_pkg_client.SimpleExecRequest:
+    properties:
+      code:
+        description: |-
+          Code is the source code to execute (for single-file execution)
+          If provided, creates a main.py with this content
+        type: string
+      config:
+        allOf:
+        - $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionConfig'
+        description: Config contains execution resource limits
+      entrypoint:
+        description: Entrypoint is the file to execute (defaults to "main.py")
+        type: string
+      files:
+        description: |-
+          Files allows multiple files to be provided (Piston-compatible)
+          Takes precedence over Code if both are provided
+        items:
+          $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.CodeFile'
+        type: array
+      stdin:
+        description: Stdin is the standard input to provide to the script
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -67,6 +114,46 @@ info:
   title: python-executor API
   version: "1.0"
 paths:
+  /eval:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Execute Python code using a simple JSON interface.
+        This endpoint is designed for AI agents and simple integrations.
+
+        Two modes are supported:
+        - Single file: provide "code" field with Python code
+        - Multi-file: provide "files" array with name/content pairs
+      parameters:
+      - description: Execution request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.SimpleExecRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution completed
+          schema:
+            $ref: '#/definitions/github_com_geraldthewes_python-executor_pkg_client.ExecutionResult'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "413":
+          description: Code size exceeds limit
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Execution failed
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Execute code via JSON (simplified API)
+      tags:
+      - execution
   /exec/async:
     post:
       consumes:

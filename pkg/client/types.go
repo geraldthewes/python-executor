@@ -56,3 +56,30 @@ type AsyncResponse struct {
 type KillResponse struct {
 	Status string `json:"status"`
 }
+
+// SimpleExecRequest is the JSON-only execution request format
+// Compatible with Replit/Piston-style APIs for simpler integrations
+type SimpleExecRequest struct {
+	// Code is the source code to execute (for single-file execution)
+	// If provided, creates a main.py with this content
+	Code string `json:"code,omitempty"`
+
+	// Files allows multiple files to be provided (Piston-compatible)
+	// Takes precedence over Code if both are provided
+	Files []CodeFile `json:"files,omitempty"`
+
+	// Entrypoint is the file to execute (defaults to "main.py")
+	Entrypoint string `json:"entrypoint,omitempty"`
+
+	// Stdin is the standard input to provide to the script
+	Stdin string `json:"stdin,omitempty"`
+
+	// Config contains execution resource limits
+	Config *ExecutionConfig `json:"config,omitempty"`
+}
+
+// CodeFile represents a single file with its content
+type CodeFile struct {
+	Name    string `json:"name"`    // filename (e.g., "main.py")
+	Content string `json:"content"` // file content
+}

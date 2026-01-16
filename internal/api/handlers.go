@@ -1,6 +1,8 @@
 package api
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -289,4 +291,162 @@ func (s *Server) executeAsync(execID string, tarData []byte, metadata *client.Me
 	}
 
 	s.storage.Update(ctx, exec)
+}
+
+// maxCodeSize is the maximum allowed size for code in JSON requests (100KB)
+const maxCodeSize = 100 * 1024
+
+// ExecuteEval handles JSON-only synchronous execution
+// @Summary Execute code via JSON (simplified API)
+// @Description Execute Python code using a simple JSON interface.
+// @Description This endpoint is designed for AI agents and simple integrations.
+// @Description
+// @Description Two modes are supported:
+// @Description - Single file: provide "code" field with Python code
+// @Description - Multi-file: provide "files" array with name/content pairs
+// @Tags execution
+// @Accept json
+// @Produce json
+// @Param request body client.SimpleExecRequest true "Execution request"
+// @Success 200 {object} client.ExecutionResult "Execution completed"
+// @Failure 400 {object} gin.H "Invalid request"
+// @Failure 413 {object} gin.H "Code size exceeds limit"
+// @Failure 500 {object} gin.H "Execution failed"
+// @Router /eval [post]
+func (s *Server) ExecuteEval(c *gin.Context) {
+	var req client.SimpleExecRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid JSON: %v", err)})
+		return
+	}
+
+	// Validate request
+	if req.Code == "" && len(req.Files) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "either 'code' or 'files' must be provided"})
+		return
+	}
+
+	// Build files list
+	var files []client.CodeFile
+	if len(req.Files) > 0 {
+		files = req.Files
+	} else {
+		// Single code mode - create main.py
+		files = []client.CodeFile{{Name: "main.py", Content: req.Code}}
+	}
+
+	// Validate size
+	var totalSize int
+	for _, f := range files {
+		totalSize += len(f.Content)
+	}
+	if totalSize > maxCodeSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": fmt.Sprintf("total code size %d bytes exceeds limit of %d bytes", totalSize, maxCodeSize),
+		})
+		return
+	}
+
+	// Build tar archive
+	tarData, err := buildTarFromFiles(files)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("building archive: %v", err)})
+		return
+	}
+
+	// Determine entrypoint
+	entrypoint := req.Entrypoint
+	if entrypoint == "" {
+		if len(req.Files) > 0 {
+			entrypoint = req.Files[0].Name
+		} else {
+			entrypoint = "main.py"
+		}
+	}
+
+	// Build metadata
+	metadata := &client.Metadata{
+		Entrypoint: entrypoint,
+		Stdin:      req.Stdin,
+		Config:     req.Config,
+	}
+
+	// Generate execution ID
+	execID := fmt.Sprintf("exe_%s", uuid.New().String())
+
+	// Create execution record
+	now := time.Now()
+	exec := &storage.Execution{
+		ID:        execID,
+		Status:    client.StatusPending,
+		Metadata:  metadata,
+		CreatedAt: now,
+	}
+
+	if err := s.storage.Create(c.Request.Context(), exec); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution"})
+		return
+	}
+
+	// Update to running
+	exec.Status = client.StatusRunning
+	exec.StartedAt = &now
+	s.storage.Update(c.Request.Context(), exec)
+
+	// Execute
+	execReq := &executor.ExecutionRequest{
+		ID:       execID,
+		TarData:  tarData,
+		Metadata: metadata,
+	}
+
+	output, err := s.executor.Execute(c.Request.Context(), execReq)
+
+	// Update execution with result
+	finishedAt := time.Now()
+	exec.FinishedAt = &finishedAt
+
+	if err != nil {
+		exec.Status = client.StatusFailed
+		exec.Error = err.Error()
+	} else {
+		exec.Status = client.StatusCompleted
+		exec.Stdout = output.Stdout
+		exec.Stderr = output.Stderr
+		exec.ExitCode = output.ExitCode
+		exec.DurationMs = output.DurationMs
+	}
+
+	s.storage.Update(c.Request.Context(), exec)
+
+	// Return result
+	c.JSON(http.StatusOK, exec.ToExecutionResult())
+}
+
+// buildTarFromFiles creates an uncompressed tar archive from code files
+func buildTarFromFiles(files []client.CodeFile) ([]byte, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	for _, f := range files {
+		header := &tar.Header{
+			Name: f.Name,
+			Mode: 0644,
+			Size: int64(len(f.Content)),
+		}
+
+		if err := tw.WriteHeader(header); err != nil {
+			return nil, fmt.Errorf("writing tar header for %s: %w", f.Name, err)
+		}
+
+		if _, err := tw.Write([]byte(f.Content)); err != nil {
+			return nil, fmt.Errorf("writing tar content for %s: %w", f.Name, err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		return nil, fmt.Errorf("closing tar writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

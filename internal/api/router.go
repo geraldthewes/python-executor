@@ -36,6 +36,9 @@ func SetupRouter(server *Server, logger *logrus.Logger) *gin.Engine {
 		v1.POST("/exec/async", server.ExecuteAsync)
 		v1.GET("/executions/:id", server.GetExecution)
 		v1.DELETE("/executions/:id", server.KillExecution)
+
+		// Simple JSON execution endpoint (Replit/Piston-compatible)
+		v1.POST("/eval", server.ExecuteEval)
 	}
 
 	// Swagger documentation
