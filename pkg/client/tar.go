@@ -10,7 +10,17 @@ import (
 	"strings"
 )
 
-// TarFromFiles creates an uncompressed tar archive from a list of file paths
+// TarFromFiles creates an uncompressed tar archive from a list of file paths.
+//
+// Each file is added to the archive with its base name (not the full path).
+//
+// Example:
+//
+//	tarData, err := client.TarFromFiles([]string{
+//	    "main.py",
+//	    "utils.py",
+//	    "config.json",
+//	})
 func TarFromFiles(files []string) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -29,7 +39,13 @@ func TarFromFiles(files []string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// TarFromDirectory creates an uncompressed tar archive from a directory
+// TarFromDirectory creates an uncompressed tar archive from a directory.
+//
+// All files in the directory are added recursively with relative paths.
+//
+// Example:
+//
+//	tarData, err := client.TarFromDirectory("./myproject")
 func TarFromDirectory(dirPath string) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -66,7 +82,13 @@ func TarFromDirectory(dirPath string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// TarFromReader creates a tar archive from stdin or any reader (single file)
+// TarFromReader creates a tar archive from an io.Reader (e.g., stdin).
+//
+// The content is read entirely and stored in the archive under the given filename.
+//
+// Example:
+//
+//	tarData, err := client.TarFromReader(os.Stdin, "main.py")
 func TarFromReader(r io.Reader, filename string) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -100,7 +122,16 @@ func TarFromReader(r io.Reader, filename string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// TarFromMap creates a tar archive from a map of filename -> content
+// TarFromMap creates a tar archive from a map of filename to content.
+//
+// This is the most convenient way to create a tar archive for simple scripts.
+//
+// Example:
+//
+//	tarData, err := client.TarFromMap(map[string]string{
+//	    "main.py":   `print("Hello!")`,
+//	    "helper.py": `def greet(): print("Hi!")`,
+//	})
 func TarFromMap(files map[string]string) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -175,7 +206,14 @@ func addFileToTar(tw *tar.Writer, filePath string, tarPath string) error {
 	return err
 }
 
-// DetectEntrypoint finds the entrypoint in a tar archive
+// DetectEntrypoint finds the Python entrypoint in a tar archive.
+//
+// The detection order is:
+//  1. main.py (highest priority)
+//  2. __main__.py
+//  3. First .py file found
+//
+// Returns an error if no Python files are found.
 func DetectEntrypoint(tarData []byte) (string, error) {
 	reader := tar.NewReader(bytes.NewReader(tarData))
 

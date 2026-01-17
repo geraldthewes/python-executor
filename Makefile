@@ -91,4 +91,35 @@ install-tools: ## Install development tools
 install:
 	sudo cp -a bin/python-executor /usr/local/bin
 
+# Documentation targets
+docs-python: ## Generate Python client docs via lazydocs
+	@echo "Generating Python client documentation..."
+	@mkdir -p docs/_generated/python
+	@PYTHONPATH=./python lazydocs \
+		--output-path docs/_generated/python \
+		--overview-file README.md \
+		--src-base-url https://github.com/geraldthewes/python-executor/blob/main/python \
+		python_executor_client
+
+docs-go: ## Generate Go client docs via gomarkdoc
+	@echo "Generating Go client documentation..."
+	@mkdir -p docs/_generated/go
+	@$(HOME)/go/bin/gomarkdoc --output docs/_generated/go/client.md ./pkg/client
+
+docs-cli: build-cli ## Generate CLI docs via cobra doc
+	@echo "Generating CLI documentation..."
+	@mkdir -p docs/_generated/cli
+	@go run ./cmd/gendocs
+
+docs-generate: docs-python docs-go docs-cli ## Generate all documentation
+	@echo "Running documentation assembly..."
+	@./scripts/generate-docs.sh
+
+docs-test: ## Test examples against deployed server (http://pyexec.cluster:9999/)
+	@echo "Testing documentation examples..."
+	@python3 scripts/test-examples.py
+	@./scripts/test-examples.sh
+
+docs: docs-generate docs-test ## Generate + test documentation (fails if server down)
+
 .DEFAULT_GOAL := help

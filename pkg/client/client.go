@@ -1,3 +1,34 @@
+// Package client provides a Go client for the python-executor service.
+//
+// The python-executor service allows remote execution of Python code in
+// isolated Docker containers. This client handles all the complexity of
+// the API, including tar archive creation, multipart requests, and response parsing.
+//
+// # Quick Start
+//
+//	c := client.New("http://pyexec.cluster:9999/")
+//
+//	tarData, _ := client.TarFromMap(map[string]string{
+//	    "main.py": `print("Hello from Go!")`,
+//	})
+//
+//	result, err := c.ExecuteSync(context.Background(), tarData, &client.Metadata{
+//	    Entrypoint: "main.py",
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	fmt.Println(result.Stdout)
+//
+// # Creating Tar Archives
+//
+// Several helper functions are provided for creating tar archives:
+//
+//   - TarFromMap: Create from a map of filename to content
+//   - TarFromFiles: Create from a list of file paths
+//   - TarFromDirectory: Create from a directory path
+//   - TarFromReader: Create from an io.Reader (e.g., stdin)
 package client
 
 import (
@@ -12,13 +43,25 @@ import (
 	"time"
 )
 
-// Client is the Go client for python-executor
+// Client is the Go client for the python-executor service.
+//
+// Create a new client with [New] and use methods like [Client.ExecuteSync]
+// and [Client.ExecuteAsync] to execute Python code remotely.
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// New creates a new client
+// New creates a new python-executor client.
+//
+// The baseURL should point to the python-executor server, e.g.,
+// "http://pyexec.cluster:9999/" or "http://localhost:8080".
+//
+// Options can be used to customize the client:
+//
+//	c := client.New("http://localhost:8080",
+//	    client.WithTimeout(60 * time.Second),
+//	)
 func New(baseURL string, opts ...Option) *Client {
 	c := &Client{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
@@ -34,7 +77,26 @@ func New(baseURL string, opts ...Option) *Client {
 	return c
 }
 
-// ExecuteSync executes code synchronously
+// ExecuteSync executes Python code and waits for the result.
+//
+// This method blocks until execution completes. Use [Client.ExecuteAsync]
+// for long-running scripts.
+//
+// Example:
+//
+//	tarData, _ := client.TarFromMap(map[string]string{
+//	    "main.py": `print("Hello!")`,
+//	})
+//
+//	result, err := c.ExecuteSync(ctx, tarData, &client.Metadata{
+//	    Entrypoint: "main.py",
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//
+//	fmt.Printf("Exit code: %d\n", result.ExitCode)
+//	fmt.Printf("Output: %s\n", result.Stdout)
 func (c *Client) ExecuteSync(ctx context.Context, tarData []byte, metadata *Metadata) (*ExecutionResult, error) {
 	body, contentType, err := c.buildMultipartRequest(tarData, metadata)
 	if err != nil {
@@ -65,7 +127,22 @@ func (c *Client) ExecuteSync(ctx context.Context, tarData []byte, metadata *Meta
 	return &result, nil
 }
 
-// ExecuteAsync executes code asynchronously
+// ExecuteAsync submits Python code for asynchronous execution.
+//
+// Returns an execution ID immediately. Use [Client.GetExecution] to check
+// status or [Client.WaitForCompletion] to wait for the result.
+//
+// Example:
+//
+//	execID, err := c.ExecuteAsync(ctx, tarData, &client.Metadata{
+//	    Entrypoint: "main.py",
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//
+//	// Later, wait for completion
+//	result, err := c.WaitForCompletion(ctx, execID, 2*time.Second)
 func (c *Client) ExecuteAsync(ctx context.Context, tarData []byte, metadata *Metadata) (string, error) {
 	body, contentType, err := c.buildMultipartRequest(tarData, metadata)
 	if err != nil {
@@ -96,7 +173,11 @@ func (c *Client) ExecuteAsync(ctx context.Context, tarData []byte, metadata *Met
 	return asyncResp.ExecutionID, nil
 }
 
-// GetExecution retrieves execution status and result
+// GetExecution retrieves the current status and result of an execution.
+//
+// Returns the execution status which may be pending, running, completed,
+// failed, or killed. Once completed, the result includes stdout, stderr,
+// and exit code.
 func (c *Client) GetExecution(ctx context.Context, executionID string) (*ExecutionResult, error) {
 	url := fmt.Sprintf("%s/api/v1/executions/%s", c.baseURL, executionID)
 
@@ -127,7 +208,9 @@ func (c *Client) GetExecution(ctx context.Context, executionID string) (*Executi
 	return &result, nil
 }
 
-// KillExecution terminates a running execution
+// KillExecution terminates a running execution.
+//
+// The Docker container running the Python code will be forcefully stopped.
 func (c *Client) KillExecution(ctx context.Context, executionID string) error {
 	url := fmt.Sprintf("%s/api/v1/executions/%s", c.baseURL, executionID)
 
@@ -149,7 +232,22 @@ func (c *Client) KillExecution(ctx context.Context, executionID string) error {
 	return nil
 }
 
-// WaitForCompletion polls until execution completes
+// WaitForCompletion polls the server until the execution completes.
+//
+// The method polls at the specified interval until the execution reaches
+// a terminal state (completed, failed, or killed).
+//
+// Example:
+//
+//	execID, _ := c.ExecuteAsync(ctx, tarData, metadata)
+//
+//	// Poll every 2 seconds
+//	result, err := c.WaitForCompletion(ctx, execID, 2*time.Second)
+//	if err != nil {
+//	    return err
+//	}
+//
+//	fmt.Println(result.Stdout)
 func (c *Client) WaitForCompletion(ctx context.Context, executionID string, pollInterval time.Duration) (*ExecutionResult, error) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()

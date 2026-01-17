@@ -33,26 +33,44 @@ var (
 )
 
 func main() {
+	rootCmd := NewRootCmd()
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// NewRootCmd creates and returns the root cobra command.
+// This is exported to allow documentation generation tools to access
+// the command tree without executing the CLI.
+func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "python-executor",
 		Short: "Remote Python code execution CLI",
 		Long: `Execute Python code remotely in isolated containers.
+
+The python-executor CLI provides command-line access to execute Python code
+on a remote server in sandboxed Docker containers.
+
+Environment Variables:
+  PYEXEC_SERVER    Server URL (default: http://localhost:8080)
 
 Documentation:     https://github.com/geraldthewes/python-executor/blob/main/README.md
 Configuration:     https://github.com/geraldthewes/python-executor/blob/main/docs/configuration.md`,
 	}
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&serverURL, "server", getEnv("PYEXEC_SERVER", "http://localhost:8080"), "Server URL")
-	rootCmd.PersistentFlags().IntVar(&timeout, "timeout", 0, "Execution timeout (seconds)")
-	rootCmd.PersistentFlags().IntVar(&memoryMB, "memory", 0, "Memory limit (MB)")
-	rootCmd.PersistentFlags().IntVar(&diskMB, "disk", 0, "Disk limit (MB)")
-	rootCmd.PersistentFlags().IntVar(&cpuShares, "cpu", 0, "CPU shares")
-	rootCmd.PersistentFlags().BoolVar(&network, "network", false, "Allow network access")
-	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image")
-	rootCmd.PersistentFlags().BoolVar(&async, "async", false, "Submit async")
-	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Quiet output")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().StringVar(&serverURL, "server", getEnv("PYEXEC_SERVER", "http://localhost:8080"), "Server URL (env: PYEXEC_SERVER)")
+	rootCmd.PersistentFlags().IntVar(&timeout, "timeout", 0, "Execution timeout in seconds (0 = server default)")
+	rootCmd.PersistentFlags().IntVar(&memoryMB, "memory", 0, "Memory limit in MB (0 = server default)")
+	rootCmd.PersistentFlags().IntVar(&diskMB, "disk", 0, "Disk limit in MB (0 = server default)")
+	rootCmd.PersistentFlags().IntVar(&cpuShares, "cpu", 0, "CPU shares (0 = server default)")
+	rootCmd.PersistentFlags().BoolVar(&network, "network", false, "Allow network access (required for pip install)")
+	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image to use")
+	rootCmd.PersistentFlags().BoolVar(&async, "async", false, "Submit asynchronously and return execution ID")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode: only output stdout on success")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose mode: show execution details")
 
 	// Commands
 	rootCmd.AddCommand(runCmd())
@@ -61,27 +79,48 @@ Configuration:     https://github.com/geraldthewes/python-executor/blob/main/doc
 	rootCmd.AddCommand(killCmd())
 	rootCmd.AddCommand(versionCmd())
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	return rootCmd
 }
 
 func runCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run [file|directory|tar] [-- script-args...]",
 		Short: "Execute code synchronously",
-		Long: `Execute Python code and wait for result.
+		Long: `Execute Python code and wait for the result.
 
-Arguments after -- are passed to the Python script.
-Example: python-executor run script.py -- arg1 arg2`,
+Input can be provided via:
+  - stdin:     echo 'print("hi")' | python-executor run
+  - file:      python-executor run script.py
+  - directory: python-executor run ./myproject/
+  - tar:       python-executor run code.tar
+
+Arguments after -- are passed to the Python script as sys.argv.
+
+Examples:
+  # Run code from stdin
+  echo 'print("Hello")' | python-executor run
+
+  # Run a Python file
+  python-executor run script.py
+
+  # Run a directory (uses main.py or __main__.py as entrypoint)
+  python-executor run ./myproject/
+
+  # Pass arguments to the script
+  python-executor run script.py -- --verbose input.txt
+
+  # Run with dependencies
+  python-executor run --requirements requirements.txt script.py
+
+  # Forward environment variables
+  python-executor run -e API_KEY -e DEBUG=true script.py`,
 		RunE: runExecution,
 	}
 
-	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
-	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
-	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
-	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable (VAR or VAR=value)")
+	cmd.Flags().StringSliceVar(&files, "file", nil, "Additional file to include (can be repeated)")
+	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Override the entrypoint script (default: auto-detect)")
+	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt (enables network)")
+	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable: VAR (from env) or VAR=value")
 
 	return cmd
 }
@@ -90,17 +129,26 @@ func submitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "submit [file|directory|tar] [-- script-args...]",
 		Short: "Submit code asynchronously",
-		Long: `Submit code for execution and return immediately.
+		Long: `Submit code for execution and return immediately with an execution ID.
 
-Arguments after -- are passed to the Python script.
-Example: python-executor submit script.py -- arg1 arg2`,
+Use this for long-running tasks. The execution ID can be used to:
+  - Check status: python-executor follow <id>
+  - Kill:         python-executor kill <id>
+
+Examples:
+  # Submit and get execution ID
+  EXEC_ID=$(python-executor submit long_task.py)
+  echo "Submitted: $EXEC_ID"
+
+  # Later, follow the execution
+  python-executor follow $EXEC_ID`,
 		RunE: submitExecution,
 	}
 
-	cmd.Flags().StringSliceVar(&files, "file", nil, "File to include (can be specified multiple times)")
-	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Entrypoint script")
-	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt file")
-	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable (VAR or VAR=value)")
+	cmd.Flags().StringSliceVar(&files, "file", nil, "Additional file to include (can be repeated)")
+	cmd.Flags().StringVar(&entrypoint, "entrypoint", "", "Override the entrypoint script (default: auto-detect)")
+	cmd.Flags().StringVar(&requirementsFile, "requirements", "", "Path to requirements.txt (enables network)")
+	cmd.Flags().StringArrayVarP(&envVars, "env", "e", nil, "Environment variable: VAR (from env) or VAR=value")
 
 	return cmd
 }
@@ -109,9 +157,17 @@ func followCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "follow <execution-id>",
 		Short: "Follow an async execution",
-		Long:  `Poll execution until complete and show result`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  followExecution,
+		Long: `Poll an asynchronous execution until complete and display the result.
+
+The command polls the server every 2 seconds until the execution finishes,
+then prints stdout/stderr and exits with the script's exit code.
+
+Example:
+  # Submit and follow
+  EXEC_ID=$(python-executor submit script.py)
+  python-executor follow $EXEC_ID`,
+		Args: cobra.ExactArgs(1),
+		RunE: followExecution,
 	}
 }
 
@@ -119,8 +175,14 @@ func killCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "kill <execution-id>",
 		Short: "Kill a running execution",
-		Args:  cobra.ExactArgs(1),
-		RunE:  killExecution,
+		Long: `Terminate a running execution.
+
+The Docker container running the Python code will be forcefully stopped.
+
+Example:
+  python-executor kill exe_550e8400-e29b-41d4-a716-446655440000`,
+		Args: cobra.ExactArgs(1),
+		RunE: killExecution,
 	}
 }
 
@@ -128,6 +190,7 @@ func versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Show version information",
+		Long:  `Display the version of the python-executor CLI.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("python-executor v1.0.0")
 		},
