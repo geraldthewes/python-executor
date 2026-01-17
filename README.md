@@ -27,7 +27,7 @@ A high-performance, self-hosted remote Python execution service designed for sec
 
 Designed as a **code interpreter** and **Python sandbox** for AI systems. Supports **LLM tool-calling**, **function calling**, and is **MCP server compatible**.
 
-Two integration approaches are available:
+Three integration approaches are available:
 
 ### Option A: Simple JSON API (Recommended for most AI agents)
 
@@ -82,7 +82,41 @@ go get github.com/geraldthewes/python-executor/pkg/client
 
 **Best for:** Large projects, complex file structures, multi-MB codebases
 
-Both approaches return the same response format:
+### Option C: Command-Line Interface
+
+Use the CLI for shell-based workflows, scripts, and AI agents that can execute commands.
+
+```bash
+# Install
+go install github.com/geraldthewes/python-executor/cmd/python-executor@latest
+
+# Pipe code via stdin (perfect for AI agents)
+echo 'print("Hello from AI")' | python-executor run -q
+
+# Run with specific server
+echo 'print("result:", 42)' | python-executor --server http://pyexec.cluster:9999 run -q
+
+# Async execution for long-running tasks
+EXEC_ID=$(python-executor submit long_task.py)
+python-executor follow $EXEC_ID
+
+# With environment variables
+python-executor run script.py --env API_KEY --env DEBUG=true
+
+# With script arguments
+python-executor run script.py -- --model gpt-4 --temperature 0.7
+```
+
+**Configuration:**
+```bash
+export PYEXEC_SERVER=http://localhost:8080  # Server URL
+```
+
+**Flags:** `-q` (quiet - stdout only), `-v` (verbose - include metadata)
+
+**Best for:** Shell scripts, CI/CD pipelines, AI agents with command execution
+
+All approaches return the same response format:
 ```json
 {
   "execution_id": "exe_...",
