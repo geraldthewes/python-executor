@@ -1,8 +1,13 @@
 package executor
 
 import (
+	"archive/tar"
+	"bytes"
+	"context"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/geraldthewes/python-executor/internal/config"
 	"github.com/geraldthewes/python-executor/pkg/client"
@@ -352,5 +357,227 @@ func TestGetEvalWrapperCode(t *testing.T) {
 	}
 	if !strings.Contains(code, ResultMarker) {
 		t.Errorf("Wrapper code should contain result marker %q", ResultMarker)
+	}
+}
+
+// Helper function to create a tar archive from file contents
+func createTar(files map[string]string) ([]byte, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	for name, content := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return nil, err
+		}
+		if _, err := tw.Write([]byte(content)); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Integration tests - require Docker daemon
+// Skip these tests if Docker is not available
+
+func skipIfNoDocker(t *testing.T) {
+	if os.Getenv("DOCKER_HOST") == "" && os.Getenv("TEST_WITH_DOCKER") == "" {
+		// Check if default Docker socket exists
+		if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
+			t.Skip("Skipping integration test: Docker not available")
+		}
+	}
+}
+
+func TestExecute_WithStdin(t *testing.T) {
+	skipIfNoDocker(t)
+
+	cfg := &config.Config{
+		Docker: config.DockerConfig{
+			Socket:      "/var/run/docker.sock",
+			NetworkMode: "bridge",
+		},
+		Defaults: config.DefaultsConfig{
+			Timeout:     30,
+			MemoryMB:    512,
+			DiskMB:      1024,
+			CPUShares:   512,
+			DockerImage: "python:3.12-slim",
+		},
+	}
+
+	executor, err := NewDockerExecutor(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	defer executor.Close()
+
+	// Python script that reads from stdin
+	code := `import sys
+data = sys.stdin.read()
+print(f"Received: {data}")
+print(f"Length: {len(data)}")
+`
+
+	tarData, err := createTar(map[string]string{"main.py": code})
+	if err != nil {
+		t.Fatalf("Failed to create tar: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req := &ExecutionRequest{
+		TarData: tarData,
+		Metadata: &client.Metadata{
+			Entrypoint: "main.py",
+			Stdin:      "Hello from stdin!",
+		},
+	}
+
+	output, err := executor.Execute(ctx, req)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if output.ExitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d. Stderr: %s", output.ExitCode, output.Stderr)
+	}
+
+	if !strings.Contains(output.Stdout, "Hello from stdin!") {
+		t.Errorf("Expected stdout to contain stdin data, got: %s", output.Stdout)
+	}
+
+	if !strings.Contains(output.Stdout, "Length: 17") {
+		t.Errorf("Expected stdout to contain correct length, got: %s", output.Stdout)
+	}
+}
+
+func TestExecute_WithStdinMultiline(t *testing.T) {
+	skipIfNoDocker(t)
+
+	cfg := &config.Config{
+		Docker: config.DockerConfig{
+			Socket:      "/var/run/docker.sock",
+			NetworkMode: "bridge",
+		},
+		Defaults: config.DefaultsConfig{
+			Timeout:     30,
+			MemoryMB:    512,
+			DiskMB:      1024,
+			CPUShares:   512,
+			DockerImage: "python:3.12-slim",
+		},
+	}
+
+	executor, err := NewDockerExecutor(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	defer executor.Close()
+
+	// Python script that reads lines from stdin
+	code := `import sys
+lines = sys.stdin.readlines()
+print(f"Got {len(lines)} lines")
+for i, line in enumerate(lines):
+    print(f"Line {i}: {line.strip()}")
+`
+
+	tarData, err := createTar(map[string]string{"main.py": code})
+	if err != nil {
+		t.Fatalf("Failed to create tar: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	stdinData := "line1\nline2\nline3\n"
+	req := &ExecutionRequest{
+		TarData: tarData,
+		Metadata: &client.Metadata{
+			Entrypoint: "main.py",
+			Stdin:      stdinData,
+		},
+	}
+
+	output, err := executor.Execute(ctx, req)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if output.ExitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d. Stderr: %s", output.ExitCode, output.Stderr)
+	}
+
+	if !strings.Contains(output.Stdout, "Got 3 lines") {
+		t.Errorf("Expected 3 lines, got: %s", output.Stdout)
+	}
+
+	if !strings.Contains(output.Stdout, "Line 0: line1") {
+		t.Errorf("Expected Line 0, got: %s", output.Stdout)
+	}
+}
+
+func TestExecute_WithoutStdin(t *testing.T) {
+	skipIfNoDocker(t)
+
+	cfg := &config.Config{
+		Docker: config.DockerConfig{
+			Socket:      "/var/run/docker.sock",
+			NetworkMode: "bridge",
+		},
+		Defaults: config.DefaultsConfig{
+			Timeout:     30,
+			MemoryMB:    512,
+			DiskMB:      1024,
+			CPUShares:   512,
+			DockerImage: "python:3.12-slim",
+		},
+	}
+
+	executor, err := NewDockerExecutor(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	defer executor.Close()
+
+	// Simple script without stdin
+	code := `print("Hello, World!")`
+
+	tarData, err := createTar(map[string]string{"main.py": code})
+	if err != nil {
+		t.Fatalf("Failed to create tar: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req := &ExecutionRequest{
+		TarData: tarData,
+		Metadata: &client.Metadata{
+			Entrypoint: "main.py",
+		},
+	}
+
+	output, err := executor.Execute(ctx, req)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if output.ExitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d. Stderr: %s", output.ExitCode, output.Stderr)
+	}
+
+	if !strings.Contains(output.Stdout, "Hello, World!") {
+		t.Errorf("Expected stdout to contain greeting, got: %s", output.Stdout)
 	}
 }

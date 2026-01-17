@@ -108,6 +108,13 @@ func (e *DockerExecutor) Execute(ctx context.Context, req *ExecutionRequest) (*E
 	}
 	defer e.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
 
+	// If stdin is provided, attach to container before starting
+	if meta.Stdin != "" {
+		if err := e.attachAndWriteStdin(execCtx, containerID, meta.Stdin); err != nil {
+			return nil, fmt.Errorf("attaching stdin: %w", err)
+		}
+	}
+
 	// Start container
 	if err := e.client.ContainerStart(execCtx, containerID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("starting container: %w", err)
@@ -154,6 +161,31 @@ func (e *DockerExecutor) Kill(ctx context.Context, containerID string) error {
 // Close closes the Docker client
 func (e *DockerExecutor) Close() error {
 	return e.client.Close()
+}
+
+// attachAndWriteStdin attaches to the container's stdin and writes data
+func (e *DockerExecutor) attachAndWriteStdin(ctx context.Context, containerID string, stdinData string) error {
+	// Attach to container with stdin
+	attachResp, err := e.client.ContainerAttach(ctx, containerID, container.AttachOptions{
+		Stream: true,
+		Stdin:  true,
+	})
+	if err != nil {
+		return fmt.Errorf("attaching to container: %w", err)
+	}
+
+	// Write stdin data and close in a goroutine
+	// This runs concurrently with container execution
+	go func() {
+		defer attachResp.Close()
+		io.WriteString(attachResp.Conn, stdinData)
+		// Close the write side to send EOF
+		if closer, ok := attachResp.Conn.(interface{ CloseWrite() error }); ok {
+			closer.CloseWrite()
+		}
+	}()
+
+	return nil
 }
 
 // ensureImage pulls the Docker image if it doesn't exist

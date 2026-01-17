@@ -172,7 +172,7 @@ class BenchmarkRunner:
         self._register("io_no_stdin", "io", "No input",
                        self._test_io_no_stdin)
         self._register("io_small_stdin", "io", "100 bytes input",
-                       self._test_io_small_stdin, slow=True)
+                       self._test_io_small_stdin)
         self._register("io_large_stdout", "io", "100KB output",
                        self._test_io_large_stdout)
 
