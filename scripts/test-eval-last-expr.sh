@@ -102,7 +102,7 @@ test_eval() {
     fi
 
     echo "PASS"
-    ((PASSED++))
+    ((++PASSED))
     return 0
 }
 
@@ -250,7 +250,7 @@ result=$(echo "$response" | jq -r '.result // "null"')
 
 if [[ "$stdout" == *"42"* ]] && [[ "$result" == "null" ]]; then
     echo "PASS"
-    ((PASSED++))
+    ((++PASSED))
 else
     echo "FAIL"
     echo "  Expected stdout with 42 and null result"

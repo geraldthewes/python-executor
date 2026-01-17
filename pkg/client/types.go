@@ -87,7 +87,7 @@ type ExecutionResult struct {
 	// Stderr is the standard error from the Python script.
 	Stderr string `json:"stderr,omitempty"`
 	// ExitCode is the process exit code (0 = success).
-	ExitCode int `json:"exit_code,omitempty"`
+	ExitCode int `json:"exit_code"`
 	// Error is an error message if the execution failed internally.
 	Error string `json:"error,omitempty"`
 	// ErrorType is the Python exception type (e.g., "SyntaxError", "NameError").
