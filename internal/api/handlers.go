@@ -34,6 +34,44 @@ var pythonErrorLinePattern = regexp.MustCompile(`File ".*", line (\d+)`)
 // pythonErrorTypePattern matches Python error types like 'SyntaxError:', 'NameError:'
 var pythonErrorTypePattern = regexp.MustCompile(`^([A-Z][a-zA-Z]*Error):`)
 
+// parseResultFromStdout extracts the REPL-style result from stdout.
+// Returns the cleaned stdout (with marker removed), the result (or nil), and whether a result was found.
+func parseResultFromStdout(stdout string) (cleanedStdout string, result *string) {
+	marker := executor.ResultMarker
+	idx := strings.LastIndex(stdout, marker)
+	if idx == -1 {
+		return stdout, nil
+	}
+
+	// Extract the JSON-encoded repr() after the marker
+	afterMarker := stdout[idx+len(marker):]
+	// Find the end of the JSON string (it's on its own line)
+	endIdx := strings.Index(afterMarker, "\n")
+	var jsonStr string
+	if endIdx == -1 {
+		jsonStr = afterMarker
+	} else {
+		jsonStr = afterMarker[:endIdx]
+	}
+
+	// Decode the JSON string to get the actual repr() value
+	var reprValue string
+	if err := json.Unmarshal([]byte(jsonStr), &reprValue); err != nil {
+		// If parsing fails, return stdout unchanged
+		return stdout, nil
+	}
+
+	// Remove the marker line from stdout
+	cleanedStdout = stdout[:idx]
+	if endIdx != -1 {
+		cleanedStdout += afterMarker[endIdx+1:]
+	}
+	// Trim trailing newline if the marker was the last thing
+	cleanedStdout = strings.TrimSuffix(cleanedStdout, "\n")
+
+	return cleanedStdout, &reprValue
+}
+
 // parseErrorFromStderr extracts error type and line number from Python stderr
 func parseErrorFromStderr(stderr string) (errorType string, errorLine int) {
 	lines := strings.Split(stderr, "\n")
@@ -394,6 +432,14 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 		files = []client.CodeFile{{Name: "main.py", Content: req.Code}}
 	}
 
+	// Add eval wrapper script if EvalLastExpr is enabled
+	if req.EvalLastExpr {
+		files = append(files, client.CodeFile{
+			Name:    executor.EvalWrapperScript,
+			Content: executor.GetEvalWrapperCode(),
+		})
+	}
+
 	// Validate size
 	var totalSize int
 	for _, f := range files {
@@ -425,10 +471,11 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 
 	// Build metadata
 	metadata := &client.Metadata{
-		Entrypoint:  entrypoint,
-		Stdin:       req.Stdin,
-		Config:      req.Config,
-		DockerImage: dockerImage,
+		Entrypoint:   entrypoint,
+		Stdin:        req.Stdin,
+		Config:       req.Config,
+		DockerImage:  dockerImage,
+		EvalLastExpr: req.EvalLastExpr,
 	}
 
 	// Generate execution ID
@@ -479,6 +526,11 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 		// Parse error details from stderr if there was an error (non-zero exit code)
 		if output.ExitCode != 0 && output.Stderr != "" {
 			exec.ErrorType, exec.ErrorLine = parseErrorFromStderr(output.Stderr)
+		}
+
+		// Parse REPL-style result from stdout if EvalLastExpr was enabled
+		if req.EvalLastExpr && output.ExitCode == 0 {
+			exec.Stdout, exec.Result = parseResultFromStdout(output.Stdout)
 		}
 	}
 

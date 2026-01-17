@@ -301,6 +301,74 @@ curl http://localhost:8080/api/v1/executions/$exec_id
 curl -X DELETE http://localhost:8080/api/v1/executions/$exec_id
 ```
 
+## REPL-style Expression Evaluation
+
+The `/api/v1/eval` endpoint supports REPL-style expression evaluation. When `eval_last_expr` is `true`, the value of the last expression is captured and returned in the `result` field.
+
+### curl Examples
+
+```bash
+# Simple calculation
+curl -s -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "2 + 2", "eval_last_expr": true}' | jq .result
+# Output: "4"
+
+# Multi-line with expression at end
+curl -s -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "x = 10\ny = 20\nx * y", "eval_last_expr": true}' | jq .result
+# Output: "200"
+
+# Print statement (no result, returns null)
+curl -s -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(\"hello\")", "eval_last_expr": true}' | jq '{stdout, result}'
+# Output: {"stdout": "hello\n", "result": null}
+
+# List comprehension
+curl -s -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "[x**2 for x in range(5)]", "eval_last_expr": true}' | jq .result
+# Output: "[0, 1, 4, 9, 16]"
+```
+
+### Python Client
+
+```python
+from python_executor_client import PythonExecutorClient
+
+client = PythonExecutorClient("http://localhost:8080")
+
+# Use eval_last_expr for calculator-style interactions
+result = client.execute_eval(
+    code="import math\nmath.pi * 2",
+    eval_last_expr=True
+)
+
+print(result.result)  # "6.283185307179586"
+print(result.stdout)  # "" (empty, no print statements)
+```
+
+### Go Client
+
+```go
+// Simple eval with expression result
+result, err := c.ExecuteEval(ctx, &client.SimpleExecRequest{
+    Code:         "sum([1, 2, 3, 4, 5])",
+    EvalLastExpr: true,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+if result.Result != nil {
+    fmt.Println("Result:", *result.Result) // "15"
+}
+```
+
+---
+
 ## MCP Server Integration
 
 If you're building an MCP (Model Context Protocol) server for AI agents:

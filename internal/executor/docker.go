@@ -17,6 +17,50 @@ import (
 	clientpkg "github.com/geraldthewes/python-executor/pkg/client"
 )
 
+// EvalWrapperScript is the name of the wrapper script for REPL-style evaluation
+const EvalWrapperScript = "_pyexec_eval.py"
+
+// ResultMarker is the delimiter used to identify the expression result in stdout
+const ResultMarker = "___PYEXEC_RESULT___"
+
+// evalWrapperCode is the Python wrapper that enables REPL-style expression evaluation.
+// It parses the user's code, and if the last statement is an expression, evaluates it
+// separately and outputs the result with a special marker.
+const evalWrapperCode = `import sys
+import ast
+import json
+
+# Read the user's code from the file passed as argument
+with open(sys.argv[1], 'r') as f:
+    code = f.read()
+
+result_marker = "___PYEXEC_RESULT___"
+
+try:
+    tree = ast.parse(code, mode='exec')
+
+    # Check if last statement is an expression
+    if tree.body and isinstance(tree.body[-1], ast.Expr):
+        last_expr = tree.body.pop()
+
+        # Execute everything except last expression
+        if tree.body:
+            exec(compile(tree, '<string>', 'exec'))
+
+        # Evaluate the last expression
+        expr_tree = ast.Expression(body=last_expr.value)
+        result = eval(compile(expr_tree, '<string>', 'eval'))
+
+        # Output result with marker (only if not None)
+        if result is not None:
+            print(f"{result_marker}{json.dumps(repr(result))}")
+    else:
+        # No trailing expression - just exec normally
+        exec(compile(tree, '<string>', 'exec'))
+except Exception:
+    raise  # Let normal error handling capture it
+`
+
 // DockerExecutor implements the Executor interface using Docker
 type DockerExecutor struct {
 	client  *client.Client
@@ -209,13 +253,27 @@ func (e *DockerExecutor) buildCommand(meta *clientpkg.Metadata) string {
 
 	// Run Python script with arguments
 	scriptPath := filepath.Join("/work", meta.Entrypoint)
-	pythonCmd := fmt.Sprintf("python %s", shellescape.Quote(scriptPath))
+
+	var pythonCmd string
+	if meta.EvalLastExpr {
+		// Use the eval wrapper script, passing the original entrypoint as argument
+		wrapperPath := filepath.Join("/work", EvalWrapperScript)
+		pythonCmd = fmt.Sprintf("python %s %s", shellescape.Quote(wrapperPath), shellescape.Quote(scriptPath))
+	} else {
+		pythonCmd = fmt.Sprintf("python %s", shellescape.Quote(scriptPath))
+	}
+
 	for _, arg := range meta.ScriptArgs {
 		pythonCmd += " " + shellescape.Quote(arg)
 	}
 	parts = append(parts, pythonCmd)
 
 	return strings.Join(parts, " && ")
+}
+
+// GetEvalWrapperCode returns the Python wrapper code for REPL-style evaluation
+func GetEvalWrapperCode() string {
+	return evalWrapperCode
 }
 
 // getLogs retrieves stdout and stderr from a container

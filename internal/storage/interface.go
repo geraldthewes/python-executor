@@ -16,8 +16,9 @@ type Execution struct {
 	Stderr      string
 	ExitCode    int
 	Error       string
-	ErrorType   string // Python error type (e.g., "SyntaxError", "NameError")
-	ErrorLine   int    // Line number where error occurred
+	ErrorType   string  // Python error type (e.g., "SyntaxError", "NameError")
+	ErrorLine   int     // Line number where error occurred
+	Result      *string // REPL-style result of last expression
 	StartedAt   *time.Time
 	FinishedAt  *time.Time
 	DurationMs  int64
@@ -63,5 +64,6 @@ func (e *Execution) ToExecutionResult() *client.ExecutionResult {
 		StartedAt:   e.StartedAt,
 		FinishedAt:  e.FinishedAt,
 		DurationMs:  e.DurationMs,
+		Result:      e.Result,
 	}
 }

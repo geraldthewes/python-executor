@@ -173,6 +173,83 @@ ValueError: invalid literal for int() with base 10: 'not a number'`,
 	}
 }
 
+func TestParseResultFromStdout(t *testing.T) {
+	tests := []struct {
+		name           string
+		stdout         string
+		wantStdout     string
+		wantResult     *string
+	}{
+		{
+			name:       "simple expression result",
+			stdout:     "___PYEXEC_RESULT___\"4\"\n",
+			wantStdout: "",
+			wantResult: strPtr("4"),
+		},
+		{
+			name:       "expression result with prior output",
+			stdout:     "hello world\n___PYEXEC_RESULT___\"15\"\n",
+			wantStdout: "hello world",
+			wantResult: strPtr("15"),
+		},
+		{
+			name:       "no result marker",
+			stdout:     "hello world\n",
+			wantStdout: "hello world\n",
+			wantResult: nil,
+		},
+		{
+			name:       "list result",
+			stdout:     "___PYEXEC_RESULT___\"[1, 2, 3]\"\n",
+			wantStdout: "",
+			wantResult: strPtr("[1, 2, 3]"),
+		},
+		{
+			name:       "string result with quotes",
+			stdout:     "___PYEXEC_RESULT___\"'hello'\"\n",
+			wantStdout: "",
+			wantResult: strPtr("'hello'"),
+		},
+		{
+			name:       "empty stdout",
+			stdout:     "",
+			wantStdout: "",
+			wantResult: nil,
+		},
+		{
+			name:       "result without trailing newline",
+			stdout:     "___PYEXEC_RESULT___\"42\"",
+			wantStdout: "",
+			wantResult: strPtr("42"),
+		},
+		{
+			name:       "multiple lines before result",
+			stdout:     "line1\nline2\nline3\n___PYEXEC_RESULT___\"result\"\n",
+			wantStdout: "line1\nline2\nline3",
+			wantResult: strPtr("result"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStdout, gotResult := parseResultFromStdout(tt.stdout)
+			if gotStdout != tt.wantStdout {
+				t.Errorf("stdout = %q, want %q", gotStdout, tt.wantStdout)
+			}
+			if (gotResult == nil) != (tt.wantResult == nil) {
+				t.Errorf("result nil = %v, want nil = %v", gotResult == nil, tt.wantResult == nil)
+			}
+			if gotResult != nil && tt.wantResult != nil && *gotResult != *tt.wantResult {
+				t.Errorf("result = %q, want %q", *gotResult, *tt.wantResult)
+			}
+		})
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestExecuteEval_Validation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

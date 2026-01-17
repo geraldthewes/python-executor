@@ -288,3 +288,69 @@ func TestBuildCommand_NoScriptArgs(t *testing.T) {
 		t.Errorf("Command should not have extra arguments, got: %s", cmd)
 	}
 }
+
+func TestBuildCommand_WithEvalLastExpr(t *testing.T) {
+	cfg := &config.Config{}
+	executor := &DockerExecutor{config: cfg}
+
+	meta := &client.Metadata{
+		Entrypoint:   "main.py",
+		EvalLastExpr: true,
+	}
+
+	cmd := executor.buildCommand(meta)
+
+	// Should contain the eval wrapper script
+	if !strings.Contains(cmd, EvalWrapperScript) {
+		t.Errorf("Command should contain eval wrapper script %q, got: %s", EvalWrapperScript, cmd)
+	}
+	// Should pass the original entrypoint as argument
+	if !strings.Contains(cmd, "main.py") {
+		t.Errorf("Command should pass main.py as argument, got: %s", cmd)
+	}
+	// The wrapper should come before the entrypoint
+	wrapperIdx := strings.Index(cmd, EvalWrapperScript)
+	entrypointIdx := strings.Index(cmd, "main.py")
+	if wrapperIdx > entrypointIdx {
+		t.Errorf("Wrapper script should come before entrypoint in command, got: %s", cmd)
+	}
+}
+
+func TestBuildCommand_WithoutEvalLastExpr(t *testing.T) {
+	cfg := &config.Config{}
+	executor := &DockerExecutor{config: cfg}
+
+	meta := &client.Metadata{
+		Entrypoint:   "main.py",
+		EvalLastExpr: false,
+	}
+
+	cmd := executor.buildCommand(meta)
+
+	// Should NOT contain the eval wrapper script
+	if strings.Contains(cmd, EvalWrapperScript) {
+		t.Errorf("Command should not contain eval wrapper script when EvalLastExpr is false, got: %s", cmd)
+	}
+	// Should directly run the entrypoint
+	if !strings.Contains(cmd, "python") || !strings.Contains(cmd, "main.py") {
+		t.Errorf("Command should run python main.py directly, got: %s", cmd)
+	}
+}
+
+func TestGetEvalWrapperCode(t *testing.T) {
+	code := GetEvalWrapperCode()
+
+	// Verify essential components of the wrapper
+	if !strings.Contains(code, "import ast") {
+		t.Error("Wrapper code should import ast")
+	}
+	if !strings.Contains(code, "ast.parse") {
+		t.Error("Wrapper code should use ast.parse")
+	}
+	if !strings.Contains(code, "ast.Expr") {
+		t.Error("Wrapper code should check for ast.Expr")
+	}
+	if !strings.Contains(code, ResultMarker) {
+		t.Errorf("Wrapper code should contain result marker %q", ResultMarker)
+	}
+}

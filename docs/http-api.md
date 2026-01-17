@@ -56,6 +56,7 @@ Execute code using a simple JSON interface. This endpoint is designed for AI age
 | `entrypoint` | string | No | `main.py` or first file | File to execute |
 | `stdin` | string | No | - | Standard input to provide |
 | `python_version` | string | No | `3.12` | Python version: `3.10`, `3.11`, `3.12`, `3.13` |
+| `eval_last_expr` | bool | No | `false` | Enable REPL-style expression evaluation |
 | `config.timeout_seconds` | int | No | 300 | Maximum execution time |
 
 \* Either `code` or `files` must be provided.
@@ -85,6 +86,37 @@ Execute code using a simple JSON interface. This endpoint is designed for AI age
   "duration_ms": 150
 }
 ```
+
+**REPL-style Expression Evaluation:**
+
+When `eval_last_expr` is `true`, the response includes a `result` field containing the value of the last expression (if any). This is useful for calculator-style interactions:
+
+```json
+// Request
+{
+  "code": "x = 5\ny = 10\nx + y",
+  "eval_last_expr": true
+}
+
+// Response
+{
+  "execution_id": "exe_550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "stdout": "",
+  "result": "15",
+  "exit_code": 0,
+  "duration_ms": 120
+}
+```
+
+| Result Field Behavior | Example Code | `result` Value |
+|-----------------------|--------------|----------------|
+| Expression returns value | `2 + 2` | `"4"` |
+| Expression with prior statements | `x = 5\nx * 2` | `"10"` |
+| Assignment (not an expression) | `x = 5` | `null` |
+| Function call returning None | `print("hi")` | `null` |
+| List expression | `[1, 2, 3]` | `"[1, 2, 3]"` |
+| String expression | `"hello"` | `"'hello'"` |
 
 **Error Response (with structured error fields):**
 
@@ -285,6 +317,7 @@ Health check endpoint.
   "error": "string (only if failed)",
   "error_type": "string (e.g., SyntaxError, NameError)",
   "error_line": 0,
+  "result": "string (REPL-style expression result)",
   "started_at": "ISO 8601 timestamp",
   "finished_at": "ISO 8601 timestamp",
   "duration_ms": 0
@@ -295,6 +328,7 @@ Health check endpoint.
 |-------|-------------|
 | `error_type` | Python exception type extracted from stderr. Only present when `exit_code != 0`. |
 | `error_line` | Line number where the error occurred. Only present when `exit_code != 0`. |
+| `result` | Value of the last expression when `eval_last_expr: true`. Contains `repr()` of the value, or `null` if the last statement was not an expression. |
 
 ### Error Response
 
@@ -368,6 +402,24 @@ curl -X DELETE http://localhost:8080/api/v1/executions/$EXEC_ID
 curl -X POST http://localhost:8080/api/v1/eval \
   -H "Content-Type: application/json" \
   -d '{"code": "print(2 + 2)"}'
+```
+
+### REPL-style expression evaluation
+
+```bash
+# Get the result of an expression
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "2 + 2", "eval_last_expr": true}'
+
+# Response: {"result": "4", ...}
+
+# Calculate with variables
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "import math\nmath.sqrt(16)", "eval_last_expr": true}'
+
+# Response: {"result": "4.0", ...}
 ```
 
 ---

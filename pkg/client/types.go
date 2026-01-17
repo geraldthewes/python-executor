@@ -49,6 +49,9 @@ type Metadata struct {
 	EnvVars []string `json:"env_vars,omitempty"`
 	// ScriptArgs are arguments passed to the Python script (sys.argv).
 	ScriptArgs []string `json:"script_args,omitempty"`
+	// EvalLastExpr enables REPL-style behavior for simple execution.
+	// Internal use only - set via SimpleExecRequest.EvalLastExpr.
+	EvalLastExpr bool `json:"-"`
 }
 
 // ExecutionConfig holds resource limits and execution settings.
@@ -97,6 +100,10 @@ type ExecutionResult struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 	// DurationMs is the total execution time in milliseconds.
 	DurationMs int64 `json:"duration_ms,omitempty"`
+	// Result contains the value of the last expression when EvalLastExpr is true.
+	// The value is the repr() of the Python object, or null if the last
+	// statement was not an expression.
+	Result *string `json:"result,omitempty"`
 }
 
 // AsyncResponse is returned when submitting async execution.
@@ -132,6 +139,11 @@ type SimpleExecRequest struct {
 	// PythonVersion specifies the Python version to use (e.g., "3.10", "3.11", "3.12", "3.13")
 	// If not specified, uses the server default (typically 3.12)
 	PythonVersion string `json:"python_version,omitempty"`
+
+	// EvalLastExpr enables REPL-style behavior: if the last statement is an
+	// expression, its value is captured and returned in the Result field.
+	// Only applies to single-file code execution.
+	EvalLastExpr bool `json:"eval_last_expr,omitempty"`
 }
 
 // CodeFile represents a single file with its content
