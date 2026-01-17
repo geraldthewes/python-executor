@@ -401,7 +401,93 @@ With timeout:
     ```
 
 
+---
 
+<a href="https://github.com/geraldthewes/python-executor/blob/main/python/python/python_executor_client/client.py#L317"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `eval`
+
+```python
+eval(
+    code: str,
+    *,
+    files: Optional[list[dict[str, str]]] = None,
+    entrypoint: Optional[str] = None,
+    stdin: Optional[str] = None,
+    python_version: Optional[str] = None,
+    timeout_seconds: Optional[int] = None,
+    eval_last_expr: bool = True
+) → ExecutionResult
+```
+
+Execute code with REPL-style expression evaluation.
+
+This method uses the simplified /api/v1/eval endpoint which accepts JSON
+and automatically evaluates the last expression in the code, returning
+its value in the result field.
+
+
+**Args:**
+
+- <b>`code`</b>: Python code to execute. Creates a main.py with this content.
+- <b>`files`</b>: Optional list of file dicts with "name" and "content" keys.
+    Takes precedence over code if provided.
+- <b>`entrypoint`</b>: File to execute. Defaults to "main.py" or first file.
+- <b>`stdin`</b>: Standard input to provide to the script.
+- <b>`python_version`</b>: Python version to use ("3.10", "3.11", "3.12", "3.13").
+    Defaults to server default (typically 3.12).
+- <b>`timeout_seconds`</b>: Maximum execution time in seconds.
+- <b>`eval_last_expr`</b>: If True (default), evaluate the last expression and
+    return its value in result. If False, behave like normal execution.
+
+
+**Returns:**
+
+- <b>`ExecutionResult`</b>: Object containing stdout, stderr, exit_code, and result.
+    The result field contains the repr() of the last expression's value,
+    or None if the last statement was not an expression.
+
+
+**Raises:**
+
+- <b>`requests.HTTPError`</b>: If the server returns an error response.
+
+
+**Example:**
+
+Simple expression:
+
+```python
+>>> result = client.eval("2 + 2")
+>>> print(result.result)
+4
+```
+
+Multi-line code:
+
+```python
+>>> result = client.eval("x = 5\ny = 10\nx + y")
+>>> print(result.result)
+15
+```
+
+Using imports:
+
+```python
+>>> result = client.eval("import math\nmath.sqrt(16)")
+>>> print(result.result)
+4.0
+```
+
+With print (result is None):
+
+```python
+>>> result = client.eval("print('hello')")
+>>> print(result.stdout)
+hello
+>>> print(result.result)
+None
+```
 
 
 ---
@@ -634,6 +720,9 @@ Contains the output and status of a completed or in-progress execution.
 - <b>`started_at`</b>: When execution started (UTC).
 - <b>`finished_at`</b>: When execution finished (UTC).
 - <b>`duration_ms`</b>: Total execution time in milliseconds.
+- <b>`result`</b>: REPL expression result when eval_last_expr is enabled.
+    Contains the repr() of the last expression's value, or None if the
+    last statement was not an expression.
 
 
 **Example:**
@@ -648,6 +737,11 @@ completed
 0
 >>> print(result.stdout)
 hello
+
+# REPL-style evaluation:
+>>> result = client.eval("x = 5\nx * 2")
+>>> print(result.result)
+10
     ```
 
 
@@ -665,7 +759,8 @@ ExecutionResult(
     error: Optional[str] = None,
     started_at: Optional[datetime] = None,
     finished_at: Optional[datetime] = None,
-    duration_ms: Optional[int] = None
+    duration_ms: Optional[int] = None,
+    result: Optional[str] = None
 ) → None
 ```
 
@@ -678,6 +773,7 @@ ExecutionResult(
 - ```execution_id``` (str)
 - ```exit_code``` (Optional)
 - ```finished_at``` (Optional)
+- ```result``` (Optional)
 - ```started_at``` (Optional)
 - ```status``` (ExecutionStatus)
 - ```stderr``` (Optional)

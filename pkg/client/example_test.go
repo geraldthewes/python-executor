@@ -213,3 +213,118 @@ print("Async complete!")
 	// Status: completed
 	// Output: Async complete!
 }
+
+// Example_evalSimple demonstrates simple REPL-style evaluation.
+// This example requires a running server.
+func Example_evalSimple() {
+	c := client.New(getServerURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Simple expression evaluation
+	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+		Code:         "2 + 2",
+		EvalLastExpr: true,
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Exit code: %d\n", result.ExitCode)
+	if result.Result != nil {
+		fmt.Printf("Result: %s\n", *result.Result)
+	}
+	// Output:
+	// Exit code: 0
+	// Result: 4
+}
+
+// Example_evalMultiLine demonstrates REPL evaluation with multi-line code.
+// This example requires a running server.
+func Example_evalMultiLine() {
+	c := client.New(getServerURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Multi-line code with variable assignment and expression
+	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+		Code: `x = 10
+y = 5
+x * y`,
+		EvalLastExpr: true,
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Exit code: %d\n", result.ExitCode)
+	if result.Result != nil {
+		fmt.Printf("Result: %s\n", *result.Result)
+	}
+	// Output:
+	// Exit code: 0
+	// Result: 50
+}
+
+// Example_evalWithImport demonstrates REPL evaluation with imports.
+// This example requires a running server.
+func Example_evalWithImport() {
+	c := client.New(getServerURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Import a module and evaluate an expression
+	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+		Code:         "import math\nmath.sqrt(16)",
+		EvalLastExpr: true,
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Exit code: %d\n", result.ExitCode)
+	if result.Result != nil {
+		fmt.Printf("Result: %s\n", *result.Result)
+	}
+	// Output:
+	// Exit code: 0
+	// Result: 4.0
+}
+
+// Example_evalWithPrint demonstrates that print statements produce stdout
+// while expressions produce results.
+// This example requires a running server.
+func Example_evalWithPrint() {
+	c := client.New(getServerURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Print produces stdout, not a result
+	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+		Code:         `print("Hello from eval!")`,
+		EvalLastExpr: true,
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Exit code: %d\n", result.ExitCode)
+	fmt.Printf("Stdout: %s", result.Stdout)
+	if result.Result != nil && *result.Result != "" {
+		fmt.Printf("Result: %s\n", *result.Result)
+	} else {
+		fmt.Println("Result: (none)")
+	}
+	// Output:
+	// Exit code: 0
+	// Stdout: Hello from eval!
+	// Result: (none)
+}

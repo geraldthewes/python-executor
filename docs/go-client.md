@@ -349,6 +349,7 @@ Output: Result: 15
 ## Index
 
 - [func DetectEntrypoint\(tarData \[\]byte\) \(string, error\)](<#DetectEntrypoint>)
+- [func \(c \*Client\) Eval\(ctx context.Context, req \*SimpleExecRequest\) \(\*ExecutionResult, error\)](<#Client.Eval>)
 - [func TarFromDirectory\(dirPath string\) \(\[\]byte, error\)](<#TarFromDirectory>)
 - [func TarFromFiles\(files \[\]string\) \(\[\]byte, error\)](<#TarFromFiles>)
 - [func TarFromMap\(files map\[string\]string\) \(\[\]byte, error\)](<#TarFromMap>)
@@ -680,6 +681,88 @@ fmt.Printf("Exit code: %d\n", result.ExitCode)
 fmt.Printf("Output: %s\n", result.Stdout)
 ```
 
+<a name="Client.Eval"></a>
+### func \(\*Client\) Eval
+
+```go
+func (c *Client) Eval(ctx context.Context, req *SimpleExecRequest) (*ExecutionResult, error)
+```
+
+Eval executes Python code using the simplified JSON API with REPL\-style evaluation.
+
+This method uses the /api/v1/eval endpoint which accepts JSON instead of multipart/form\-data with tar archives, making it ideal for simple code execution.
+
+When EvalLastExpr is true, the last expression in the code will be evaluated and its value returned in the Result field.
+
+Example:
+
+```go
+result, err := c.Eval(ctx, &client.SimpleExecRequest{
+    Code: "x = 5\nx * 2",
+    EvalLastExpr: true,
+})
+if err != nil {
+    return err
+}
+fmt.Println(*result.Result)  // Output: 10
+```
+
+<details><summary>Example (REPL Evaluation)</summary>
+<p>
+
+Example\_replEvaluation demonstrates REPL\-style code evaluation. This example requires a running server.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/geraldthewes/python-executor/pkg/client"
+)
+
+func getServerURL() string {
+	if url := os.Getenv("PYEXEC_SERVER"); url != "" {
+		return url
+	}
+	return "http://pyexec.cluster:9999/"
+}
+
+func main() {
+	c := client.New(getServerURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+		Code:         "import math\nmath.sqrt(16)",
+		EvalLastExpr: true,
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Status: %s\n", result.Status)
+	if result.Result != nil {
+		fmt.Printf("Result: %s\n", *result.Result)
+	}
+}
+```
+
+#### Output
+
+```
+Status: completed
+Result: 4.0
+```
+
+</p>
+</details>
+
 <a name="Client.GetExecution"></a>
 ### func \(\*Client\) GetExecution
 
@@ -798,6 +881,10 @@ type ExecutionResult struct {
     FinishedAt *time.Time `json:"finished_at,omitempty"`
     // DurationMs is the total execution time in milliseconds.
     DurationMs int64 `json:"duration_ms,omitempty"`
+    // Result contains the value of the last expression when EvalLastExpr is true.
+    // The value is the repr() of the Python object, or nil if the last
+    // statement was not an expression.
+    Result *string `json:"result,omitempty"`
 }
 ```
 

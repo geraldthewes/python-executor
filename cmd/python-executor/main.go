@@ -30,6 +30,10 @@ var (
 	entrypoint       string
 	requirementsFile string
 	envVars          []string
+
+	// eval command flags
+	pythonVersion string
+	noResult      bool
 )
 
 func main() {
@@ -77,6 +81,7 @@ Configuration:     https://github.com/geraldthewes/python-executor/blob/main/doc
 	rootCmd.AddCommand(submitCmd())
 	rootCmd.AddCommand(followCmd())
 	rootCmd.AddCommand(killCmd())
+	rootCmd.AddCommand(evalCmd())
 	rootCmd.AddCommand(versionCmd())
 
 	return rootCmd
@@ -186,6 +191,52 @@ Example:
 	}
 }
 
+func evalCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "eval [code]",
+		Short: "Evaluate code with REPL-style expression results",
+		Long: `Execute Python code and return the value of the last expression.
+
+This command uses the simplified JSON API with REPL-style evaluation.
+If the last statement is an expression, its value is printed after any
+stdout output.
+
+Input can be provided via:
+  - argument:  python-executor eval '2 + 2'
+  - stdin:     echo '2 + 2' | python-executor eval
+
+Examples:
+  # Simple expression
+  python-executor eval '2 + 2'
+  # Output: 4
+
+  # Multi-line code (use single quotes to preserve newlines)
+  python-executor eval 'x = 5
+  x * 2'
+  # Output: 10
+
+  # Using imports
+  python-executor eval 'import math; math.sqrt(16)'
+  # Output: 4.0
+
+  # From stdin
+  echo 'import sys; sys.version' | python-executor eval
+
+  # Specify Python version
+  python-executor eval --python 3.11 'import sys; sys.version'
+
+  # Disable result output (only show stdout)
+  python-executor eval --no-result 'print("hello"); 42'
+  # Output: hello`,
+		RunE: evalExecution,
+	}
+
+	cmd.Flags().StringVar(&pythonVersion, "python", "", "Python version (3.10, 3.11, 3.12, 3.13)")
+	cmd.Flags().BoolVar(&noResult, "no-result", false, "Disable expression evaluation (just run code)")
+
+	return cmd
+}
+
 func versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
@@ -284,6 +335,93 @@ func killExecution(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func evalExecution(cmd *cobra.Command, args []string) error {
+	var code string
+
+	if len(args) >= 1 {
+		code = args[0]
+	} else {
+		// Read from stdin
+		stdinData, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("reading stdin: %w", err)
+		}
+		if len(stdinData) == 0 {
+			return fmt.Errorf("no input provided: either specify code as an argument or pipe via stdin")
+		}
+		code = string(stdinData)
+	}
+
+	c := client.New(serverURL)
+	ctx := context.Background()
+
+	req := &client.SimpleExecRequest{
+		Code:         code,
+		EvalLastExpr: !noResult,
+	}
+
+	if pythonVersion != "" {
+		req.PythonVersion = pythonVersion
+	}
+
+	if timeout > 0 {
+		req.Config = &client.ExecutionConfig{
+			TimeoutSeconds: timeout,
+		}
+	}
+
+	result, err := c.Eval(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	printEvalResult(result)
+	os.Exit(result.ExitCode)
+	return nil
+}
+
+func printEvalResult(result *client.ExecutionResult) {
+	if quiet {
+		if result.ExitCode == 0 {
+			// In quiet mode, prefer result over stdout for eval
+			if result.Result != nil && *result.Result != "" {
+				fmt.Println(*result.Result)
+			} else if result.Stdout != "" {
+				fmt.Print(result.Stdout)
+			}
+		}
+		return
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Execution ID: %s\n", result.ExecutionID)
+		fmt.Fprintf(os.Stderr, "Status: %s\n", result.Status)
+		if result.DurationMs > 0 {
+			fmt.Fprintf(os.Stderr, "Duration: %dms\n", result.DurationMs)
+		}
+		fmt.Fprintf(os.Stderr, "---\n")
+	}
+
+	// Print stdout first
+	if result.Stdout != "" {
+		fmt.Print(result.Stdout)
+	}
+
+	// Print result (expression value)
+	if result.Result != nil && *result.Result != "" {
+		fmt.Println(*result.Result)
+	}
+
+	// Print stderr
+	if result.Stderr != "" {
+		fmt.Fprint(os.Stderr, result.Stderr)
+	}
+
+	if result.Error != "" {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error)
+	}
 }
 
 // splitArgsAtDash separates positional args from script args at the -- separator

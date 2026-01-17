@@ -272,6 +272,68 @@ func (c *Client) WaitForCompletion(ctx context.Context, executionID string, poll
 	}
 }
 
+// Eval executes Python code using the simplified JSON API with REPL-style evaluation.
+//
+// This method uses the /api/v1/eval endpoint which accepts JSON instead of
+// multipart/form-data with tar archives, making it ideal for simple code execution.
+//
+// When EvalLastExpr is true (the default for this endpoint), the last expression
+// in the code will be evaluated and its value returned in the Result field.
+//
+// Example:
+//
+//	result, err := c.Eval(ctx, &client.SimpleExecRequest{
+//	    Code: "x = 5\nx * 2",
+//	    EvalLastExpr: true,
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//	fmt.Println(*result.Result)  // Output: 10
+func (c *Client) Eval(ctx context.Context, req *SimpleExecRequest) (*ExecutionResult, error) {
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/v1/eval", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+			return nil, fmt.Errorf("server returned 400: unable to parse error response")
+		}
+		return nil, fmt.Errorf("bad request: %s", errResp.Error)
+	}
+
+	if resp.StatusCode == http.StatusRequestEntityTooLarge {
+		return nil, fmt.Errorf("code exceeds maximum size limit")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned %d", resp.StatusCode)
+	}
+
+	var result ExecutionResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // buildMultipartRequest creates a multipart form request
 func (c *Client) buildMultipartRequest(tarData []byte, metadata *Metadata) (io.Reader, string, error) {
 	body := &bytes.Buffer{}

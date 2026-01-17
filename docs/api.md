@@ -138,6 +138,7 @@ The `metadata` field must be a JSON string with the following structure:
 ### POST /api/v1/eval
 
 Execute code using a simple JSON interface. This endpoint is designed for AI agents and simple integrations.
+Supports REPL-style evaluation where the last expression's value is returned.
 
 **Request:**
 - Content-Type: `application/json`
@@ -149,6 +150,7 @@ Execute code using a simple JSON interface. This endpoint is designed for AI age
   "code": "print('Hello, World!')",
   "python_version": "3.12",
   "stdin": "input data",
+  "eval_last_expr": true,
   "config": {
     "timeout_seconds": 30
   }
@@ -162,6 +164,7 @@ Execute code using a simple JSON interface. This endpoint is designed for AI age
 | `entrypoint` | string | No | `main.py` or first file | File to execute |
 | `stdin` | string | No | - | Standard input to provide |
 | `python_version` | string | No | `3.12` | Python version: `3.10`, `3.11`, `3.12`, `3.13` |
+| `eval_last_expr` | bool | No | false | Enable REPL-style evaluation of last expression |
 | `config.timeout_seconds` | int | No | 300 | Maximum execution time |
 
 \* Either `code` or `files` must be provided.
@@ -188,9 +191,28 @@ Execute code using a simple JSON interface. This endpoint is designed for AI age
   "stdout": "Hello, World!\n",
   "stderr": "",
   "exit_code": 0,
-  "duration_ms": 150
+  "duration_ms": 150,
+  "result": null
 }
 ```
+
+**REPL-style Response (with eval_last_expr: true):**
+
+```json
+{
+  "execution_id": "exe_550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "stdout": "",
+  "stderr": "",
+  "exit_code": 0,
+  "duration_ms": 120,
+  "result": "4"
+}
+```
+
+| Response Field | Description |
+|----------------|-------------|
+| `result` | The repr() of the last expression's value when `eval_last_expr` is true. `null` if the last statement was not an expression or `eval_last_expr` is false. |
 
 **Error Response (with structured error fields):**
 
@@ -357,7 +379,8 @@ Health check endpoint.
   "error_line": 0,
   "started_at": "ISO 8601 timestamp",
   "finished_at": "ISO 8601 timestamp",
-  "duration_ms": 0
+  "duration_ms": 0,
+  "result": "string (REPL expression value, or null)"
 }
 ```
 
@@ -365,6 +388,7 @@ Health check endpoint.
 |-------|-------------|
 | `error_type` | Python exception type extracted from stderr (e.g., `SyntaxError`, `NameError`, `TypeError`). Only present when `exit_code != 0`. |
 | `error_line` | Line number where the error occurred, extracted from Python traceback. Only present when `exit_code != 0`. |
+| `result` | The repr() of the last expression's value when `eval_last_expr` is true. `null` if the last statement was not an expression or when using exec/sync endpoint. |
 
 ### Error Response
 

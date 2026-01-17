@@ -390,22 +390,15 @@ class BenchmarkRunner:
                 error=str(e),
             )
 
-    def _execute_eval_and_measure(self, code: str) -> TestResult:
-        """Execute code via /api/v1/eval and measure timing."""
+    def _execute_eval_and_measure(self, code: str, eval_last_expr: bool = True) -> TestResult:
+        """Execute code via client.eval() and measure timing."""
         start = time.perf_counter()
         try:
-            resp = requests.post(
-                f"{self.server_url}/api/v1/eval",
-                json={"code": code, "eval_last_expr": True},
-                timeout=60,
-            )
+            result = self.client.eval(code, eval_last_expr=eval_last_expr)
             elapsed_ms = (time.perf_counter() - start) * 1000
-            resp.raise_for_status()
 
-            data = resp.json()
-            # Eval endpoint returns status: "completed" on success
-            success = data.get("status") == "completed"
-            server_duration_ms = data.get("duration_ms")
+            success = result.status == ExecutionStatus.COMPLETED and (result.exit_code is None or result.exit_code == 0)
+            server_duration_ms = result.duration_ms
             overhead_ms = None
             if server_duration_ms is not None:
                 overhead_ms = elapsed_ms - server_duration_ms
@@ -415,7 +408,7 @@ class BenchmarkRunner:
                 client_latency_ms=round(elapsed_ms, 2),
                 server_duration_ms=server_duration_ms,
                 overhead_ms=round(overhead_ms, 2) if overhead_ms else None,
-                error=data.get("stderr") if not success else None,
+                error=result.stderr if not success else None,
             )
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start) * 1000

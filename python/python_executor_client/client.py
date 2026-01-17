@@ -314,6 +314,97 @@ class PythonExecutorClient:
 
             time.sleep(poll_interval)
 
+    def eval(
+        self,
+        code: str,
+        *,
+        files: Optional[list[dict[str, str]]] = None,
+        entrypoint: Optional[str] = None,
+        stdin: Optional[str] = None,
+        python_version: Optional[str] = None,
+        timeout_seconds: Optional[int] = None,
+        eval_last_expr: bool = True,
+    ) -> ExecutionResult:
+        """Execute code with REPL-style expression evaluation.
+
+        This method uses the simplified /api/v1/eval endpoint which accepts JSON
+        and automatically evaluates the last expression in the code, returning
+        its value in the result field.
+
+        Args:
+            code: Python code to execute. Creates a main.py with this content.
+            files: Optional list of file dicts with "name" and "content" keys.
+                Takes precedence over code if provided.
+            entrypoint: File to execute. Defaults to "main.py" or first file.
+            stdin: Standard input to provide to the script.
+            python_version: Python version to use ("3.10", "3.11", "3.12", "3.13").
+                Defaults to server default (typically 3.12).
+            timeout_seconds: Maximum execution time in seconds.
+            eval_last_expr: If True (default), evaluate the last expression and
+                return its value in result. If False, behave like normal execution.
+
+        Returns:
+            ExecutionResult: Object containing stdout, stderr, exit_code, and result.
+                The result field contains the repr() of the last expression's value,
+                or None if the last statement was not an expression.
+
+        Raises:
+            requests.HTTPError: If the server returns an error response.
+
+        Example:
+            Simple expression:
+
+            >>> result = client.eval("2 + 2")
+            >>> print(result.result)
+            4
+
+            Multi-line code:
+
+            >>> result = client.eval("x = 5\\ny = 10\\nx + y")
+            >>> print(result.result)
+            15
+
+            Using imports:
+
+            >>> result = client.eval("import math\\nmath.sqrt(16)")
+            >>> print(result.result)
+            4.0
+
+            With print (result is None):
+
+            >>> result = client.eval("print('hello')")
+            >>> print(result.stdout)
+            hello
+            >>> print(result.result)
+            None
+        """
+        payload: dict = {
+            "eval_last_expr": eval_last_expr,
+        }
+
+        if files is not None:
+            payload["files"] = files
+        else:
+            payload["code"] = code
+
+        if entrypoint is not None:
+            payload["entrypoint"] = entrypoint
+        if stdin is not None:
+            payload["stdin"] = stdin
+        if python_version is not None:
+            payload["python_version"] = python_version
+        if timeout_seconds is not None:
+            payload["config"] = {"timeout_seconds": timeout_seconds}
+
+        response = self.session.post(
+            f"{self.base_url}/api/v1/eval",
+            json=payload,
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+
+        return ExecutionResult.from_dict(response.json())
+
     def _prepare_request(
         self,
         files: Optional[Union[dict[str, str], Path, str]],

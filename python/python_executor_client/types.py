@@ -144,6 +144,9 @@ class ExecutionResult:
         started_at: When execution started (UTC).
         finished_at: When execution finished (UTC).
         duration_ms: Total execution time in milliseconds.
+        result: REPL expression result when eval_last_expr is enabled.
+            Contains the repr() of the last expression's value, or None
+            if the last statement was not an expression.
 
     Example:
         >>> result = client.execute_sync(
@@ -155,6 +158,11 @@ class ExecutionResult:
         0
         >>> print(result.stdout)
         hello
+
+        REPL-style evaluation:
+        >>> result = client.eval("x = 5\\nx * 2")
+        >>> print(result.result)
+        10
     """
     execution_id: str
     status: ExecutionStatus
@@ -165,6 +173,7 @@ class ExecutionResult:
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     duration_ms: Optional[int] = None
+    result: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "ExecutionResult":
@@ -186,4 +195,5 @@ class ExecutionResult:
             started_at=datetime.fromisoformat(data["started_at"].rstrip("Z")) if data.get("started_at") else None,
             finished_at=datetime.fromisoformat(data["finished_at"].rstrip("Z")) if data.get("finished_at") else None,
             duration_ms=data.get("duration_ms"),
+            result=data.get("result"),
         )
