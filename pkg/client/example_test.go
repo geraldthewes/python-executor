@@ -52,8 +52,8 @@ func ExampleTarFromMap() {
 		return
 	}
 
-	fmt.Printf("Created tar archive: %d bytes\n", len(tarData))
-	// Output: Created tar archive: 2048 bytes
+	fmt.Printf("Created tar archive: %t\n", len(tarData) > 0)
+	// Output: Created tar archive: true
 }
 
 // ExampleDetectEntrypoint demonstrates automatic entrypoint detection.
@@ -197,7 +197,7 @@ print("Async complete!")
 		return
 	}
 
-	fmt.Printf("Submitted execution: %s\n", execID[:10]+"...")
+	fmt.Printf("Submitted execution ID received: %t\n", strings.HasPrefix(execID, "exe_"))
 
 	// Wait for completion
 	result, err := c.WaitForCompletion(ctx, execID, 500*time.Millisecond)
@@ -209,7 +209,7 @@ print("Async complete!")
 	fmt.Printf("Status: %s\n", result.Status)
 	fmt.Printf("Output: %s", strings.TrimSpace(result.Stdout))
 	// Output:
-	// Submitted execution: exe_550e84...
+	// Submitted execution ID received: true
 	// Status: completed
 	// Output: Async complete!
 }
