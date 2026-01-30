@@ -144,6 +144,11 @@ type SimpleExecRequest struct {
 	// expression, its value is captured and returned in the Result field.
 	// Only applies to single-file code execution.
 	EvalLastExpr bool `json:"eval_last_expr,omitempty"`
+
+	// RequirementsTxt allows explicit package specification.
+	// These are merged with auto-detected packages (user-provided takes precedence).
+	// Set to "-" to disable auto-detection entirely for this request.
+	RequirementsTxt string `json:"requirements_txt,omitempty"`
 }
 
 // CodeFile represents a single file with its content

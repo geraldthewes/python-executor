@@ -32,11 +32,12 @@ type DockerConfig struct {
 
 // DefaultsConfig holds default execution parameters
 type DefaultsConfig struct {
-	Timeout      int
-	MemoryMB     int
-	DiskMB       int
-	CPUShares    int
-	DockerImage  string
+	Timeout           int
+	MemoryMB          int
+	DiskMB            int
+	CPUShares         int
+	DockerImage       string
+	AutoDetectImports bool
 }
 
 // ConsulConfig holds Consul configuration
@@ -66,11 +67,12 @@ func Load() *Config {
 			NetworkMode: getEnv("PYEXEC_NETWORK_MODE", "host"),
 		},
 		Defaults: DefaultsConfig{
-			Timeout:     getEnvInt("PYEXEC_DEFAULT_TIMEOUT", 300),
-			MemoryMB:    getEnvInt("PYEXEC_DEFAULT_MEMORY_MB", 1024),
-			DiskMB:      getEnvInt("PYEXEC_DEFAULT_DISK_MB", 2048),
-			CPUShares:   getEnvInt("PYEXEC_DEFAULT_CPU_SHARES", 1024),
-			DockerImage: getEnv("PYEXEC_DEFAULT_IMAGE", "python:3.12-slim"),
+			Timeout:           getEnvInt("PYEXEC_DEFAULT_TIMEOUT", 300),
+			MemoryMB:          getEnvInt("PYEXEC_DEFAULT_MEMORY_MB", 1024),
+			DiskMB:            getEnvInt("PYEXEC_DEFAULT_DISK_MB", 2048),
+			CPUShares:         getEnvInt("PYEXEC_DEFAULT_CPU_SHARES", 1024),
+			DockerImage:       getEnv("PYEXEC_DEFAULT_IMAGE", "python:3.12-slim"),
+			AutoDetectImports: getEnvBool("PYEXEC_AUTO_DETECT_IMPORTS", true),
 		},
 		Consul: ConsulConfig{
 			Address:   getEnv("PYEXEC_CONSUL_ADDR", "localhost:8500"),
@@ -114,6 +116,20 @@ func getEnvStringSlice(key string, defaultValue []string) []string {
 		}
 		if len(result) > 0 {
 			return result
+		}
+	}
+	return defaultValue
+}
+
+// getEnvBool retrieves an environment variable as bool or returns a default value
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		lower := strings.ToLower(value)
+		if lower == "true" || lower == "1" || lower == "yes" {
+			return true
+		}
+		if lower == "false" || lower == "0" || lower == "no" {
+			return false
 		}
 	}
 	return defaultValue

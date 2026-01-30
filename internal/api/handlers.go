@@ -15,7 +15,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/geraldthewes/python-executor/internal/config"
 	"github.com/geraldthewes/python-executor/internal/executor"
+	"github.com/geraldthewes/python-executor/internal/imports"
 	"github.com/geraldthewes/python-executor/internal/storage"
 	"github.com/geraldthewes/python-executor/pkg/client"
 )
@@ -105,13 +107,15 @@ func parseErrorFromStderr(stderr string) (errorType string, errorLine int) {
 type Server struct {
 	storage  storage.Storage
 	executor executor.Executor
+	config   *config.Config
 }
 
 // NewServer creates a new API server
-func NewServer(storage storage.Storage, exec executor.Executor) *Server {
+func NewServer(storage storage.Storage, exec executor.Executor, cfg *config.Config) *Server {
 	return &Server{
 		storage:  storage,
 		executor: exec,
+		config:   cfg,
 	}
 }
 
@@ -469,13 +473,54 @@ func (s *Server) ExecuteEval(c *gin.Context) {
 		}
 	}
 
+	// Auto-detect imports if enabled
+	var requirementsTxt string
+	autoDetectEnabled := s.config != nil && s.config.Defaults.AutoDetectImports
+
+	// "-" means explicitly disable auto-detection for this request
+	if req.RequirementsTxt == "-" {
+		requirementsTxt = ""
+	} else if autoDetectEnabled {
+		// Collect all Python code for analysis
+		var allCode strings.Builder
+		for _, f := range files {
+			if strings.HasSuffix(f.Name, ".py") {
+				allCode.WriteString(f.Content)
+				allCode.WriteString("\n")
+			}
+		}
+
+		// Detect third-party imports
+		detectedReqs := imports.DetectRequirements(allCode.String())
+
+		// Merge with user-provided requirements (user-provided takes precedence)
+		requirementsTxt = imports.MergeRequirements(detectedReqs, req.RequirementsTxt)
+	} else {
+		// Auto-detect disabled, use only user-provided
+		requirementsTxt = req.RequirementsTxt
+	}
+
 	// Build metadata
 	metadata := &client.Metadata{
-		Entrypoint:   entrypoint,
-		Stdin:        req.Stdin,
-		Config:       req.Config,
-		DockerImage:  dockerImage,
-		EvalLastExpr: req.EvalLastExpr,
+		Entrypoint:      entrypoint,
+		Stdin:           req.Stdin,
+		Config:          req.Config,
+		DockerImage:     dockerImage,
+		EvalLastExpr:    req.EvalLastExpr,
+		RequirementsTxt: requirementsTxt,
+	}
+
+	// Auto-enable network if packages need to be installed
+	if requirementsTxt != "" {
+		if metadata.Config == nil {
+			metadata.Config = &client.ExecutionConfig{}
+		}
+		// Only enable network if it wasn't explicitly disabled by the user
+		// NetworkDisabled defaults to false (zero value), so we need to check
+		// if Config was provided and explicitly set NetworkDisabled
+		if req.Config == nil || !req.Config.NetworkDisabled {
+			metadata.Config.NetworkDisabled = false
+		}
 	}
 
 	// Generate execution ID

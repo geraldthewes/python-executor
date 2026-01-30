@@ -85,7 +85,7 @@ func main() {
 	defer exec.Close()
 
 	// Create API server
-	apiServer := api.NewServer(store, exec)
+	apiServer := api.NewServer(store, exec, cfg)
 	router := api.SetupRouter(apiServer, logger)
 
 	// Start cleanup routine

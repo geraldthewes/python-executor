@@ -17,6 +17,7 @@ A high-performance, self-hosted remote Python execution service designed for sec
 - 🔌 **Consul Integration** - Optional distributed state storage with in-memory fallback
 - 📝 **API Documentation** - Complete API reference with Swagger UI at `/docs`
 - 🐍 **Custom Requirements** - Install dependencies via requirements.txt
+- 🤖 **Auto-detect Imports** - Automatically detects and installs third-party packages
 - ⚙️ **Pre-execution Commands** - Run setup commands (apt install, etc.)
 - 🎯 **Resource Limits** - Configurable memory, CPU, disk, and timeout limits
 - 🚫 **Network Isolation** - Network disabled by default for security
@@ -62,6 +63,15 @@ curl -X POST http://localhost:8080/api/v1/eval \
 ```
 
 **Supported Python versions:** 3.10, 3.11, 3.12 (default), 3.13
+
+**Auto-detect imports:** The `/api/v1/eval` endpoint automatically detects third-party imports and installs them. This works out-of-the-box for packages like `numpy`, `pandas`, `requests`, `sympy`, etc.
+
+```bash
+# This automatically detects and installs numpy
+curl -X POST http://localhost:8080/api/v1/eval \
+  -H "Content-Type: application/json" \
+  -d '{"code": "import numpy as np; print(np.array([1,2,3]))"}'
+```
 
 **Best for:** Simple scripts, quick evaluations, LLM tool-calling
 **Limitation:** 100KB total code size
@@ -358,6 +368,7 @@ export PYEXEC_CONSUL_ADDR=consul:8500
 # Defaults
 export PYEXEC_DEFAULT_TIMEOUT=300
 export PYEXEC_DEFAULT_MEMORY_MB=1024
+export PYEXEC_AUTO_DETECT_IMPORTS=true  # Auto-detect and install packages (default: true)
 
 # Docker network settings
 export PYEXEC_NETWORK_MODE=host          # or "bridge"
